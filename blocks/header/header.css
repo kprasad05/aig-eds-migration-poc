@@ -87,7 +87,13 @@ header nav .nav-sections .nav-item {
   position: relative;
 }
 
-header nav .nav-sections .nav-item > a {
+/* EDS may wrap the top-level link in a <p>; reset that wrapper */
+header nav .nav-sections .nav-item > p {
+  margin: 0;
+}
+
+header nav .nav-sections .nav-item > a,
+header nav .nav-sections .nav-item > p > a {
   display: block;
   padding: 17px 16px;
   color: #fff;
@@ -99,7 +105,8 @@ header nav .nav-sections .nav-item > a {
   white-space: nowrap;
 }
 
-header nav .nav-sections .nav-item > a:hover { text-decoration: underline; }
+header nav .nav-sections .nav-item > a:hover,
+header nav .nav-sections .nav-item > p > a:hover { text-decoration: underline; }
 
 /* +/- toggle button */
 header nav .nav-sections .nav-item-toggle {
@@ -286,7 +293,8 @@ header nav[aria-expanded='true'] .nav-hamburger-icon::after {
     border-top: 1px solid rgb(255 255 255 / 20%);
   }
 
-  header nav .nav-sections .nav-item > a {
+  header nav .nav-sections .nav-item > a,
+  header nav .nav-sections .nav-item > p > a {
     padding: 14px 0;
     color: #fff;
   }

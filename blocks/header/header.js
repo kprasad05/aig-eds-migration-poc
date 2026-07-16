@@ -61,7 +61,8 @@ export default async function decorate(block) {
         const toggle = document.createElement('button');
         toggle.type = 'button';
         toggle.className = 'nav-item-toggle';
-        toggle.setAttribute('aria-label', li.querySelector(':scope > a')?.textContent || 'Toggle submenu');
+        const labelLink = li.querySelector(':scope > a, :scope > p > a');
+        toggle.setAttribute('aria-label', labelLink?.textContent || 'Toggle submenu');
         li.insertBefore(toggle, submenu);
         // Desktop: hover opens; click toggle expands (mobile)
         li.addEventListener('mouseenter', () => {
