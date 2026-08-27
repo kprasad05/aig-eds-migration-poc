@@ -5,6 +5,6 @@ import DA_SDK from 'https://da.live/nx/utils/sdk.js';
   const { org, repo, path } = context;
 
   const el = document.createElement('p');
-  el.textContent = `Tag Gen loaded for /${org}/${repo}${path}`;
+  el.textContent = `Ada Scan loaded for /${org}/${repo}${path}`;
   document.body.append(el);
 }());
