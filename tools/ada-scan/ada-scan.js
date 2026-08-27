@@ -1,6 +1,7 @@
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { scanAccessibility } from './utils.js';
 
+// Formats issues found for display
 function renderIssues(container, issues) {
   container.innerHTML = '';
 
@@ -23,6 +24,7 @@ function renderIssues(container, issues) {
 }
 
 (async function init() {
+  // Debug: page context
   const { context, token } = await DA_SDK;
   console.log('ADA SCAN context', context);
   const { org, site, path } = context;
@@ -34,6 +36,7 @@ function renderIssues(container, issues) {
   const results = document.createElement('div');
   results.className = 'results';
 
+  // Button triggers ADA scan
   button.addEventListener('click', async () => {
     button.disabled = true;
     results.innerHTML = '';
