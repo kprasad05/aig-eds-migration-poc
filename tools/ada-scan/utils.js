@@ -21,7 +21,7 @@ const VAGUE_LINK_TEXT = ['click here', 'here', 'read more', 'more', 'link', 'thi
 function checkImages(doc) {
   return [...doc.querySelectorAll('img')].reduce((issues, img) => {
     if (!img.hasAttribute('alt')) {
-      issues.push({ rule: 'image-alt', message: `Image missing "alt" attribute: ${img.getAttribute('src') || '(no src)'}` });
+      issues.push({ rule: 'image-alt', message: 'Image missing "alt" attribute' });
     }
     return issues;
   }, []);
@@ -32,9 +32,9 @@ function checkLinks(doc) {
     const text = (link.textContent || '').trim().toLowerCase();
     const label = link.getAttribute('aria-label');
     if (!text && !label) {
-      issues.push({ rule: 'link-name', message: `Link has no accessible text: ${link.getAttribute('href')}` });
+      issues.push({ rule: 'link-name', message: 'Link has no accessible text' });
     } else if (!label && VAGUE_LINK_TEXT.includes(text)) {
-      issues.push({ rule: 'link-name', message: `Link text is not descriptive ("${text}"): ${link.getAttribute('href')}` });
+      issues.push({ rule: 'link-name', message: `Link text is not descriptive ("${text}")` });
     }
     return issues;
   }, []);

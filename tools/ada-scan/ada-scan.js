@@ -17,7 +17,16 @@ function renderIssues(container, issues) {
   const list = document.createElement("ul");
   issues.forEach(({ rule, message }) => {
     const item = document.createElement("li");
-    item.textContent = `[${rule}] ${message}`;
+
+    const ruleLabel = document.createElement("p");
+    ruleLabel.className = "rule";
+    ruleLabel.textContent = rule.replace(/-/g, " ");
+
+    const messageText = document.createElement("p");
+    messageText.className = "message";
+    messageText.textContent = message;
+
+    item.append(ruleLabel, messageText);
     list.append(item);
   });
   container.append(list);

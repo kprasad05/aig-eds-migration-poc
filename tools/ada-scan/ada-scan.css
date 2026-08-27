@@ -29,8 +29,21 @@ body {
   border-radius: 8px;
   background: #fdecea;
   border-left: 4px solid #d93025;
-  font-size: 14px;
-  line-height: 1.4;
   overflow-wrap: break-word;
   word-break: break-word;
+}
+
+.results .rule {
+  margin: 0 0 2px 0;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #d93025;
+}
+
+.results .message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
 }
