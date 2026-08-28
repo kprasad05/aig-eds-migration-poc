@@ -36,7 +36,9 @@ function buildEntry(row) {
   const loc = `${host}${row.path}`;
   const title = escapeXml(row.title || row.path);
   const description = escapeXml(row.description || row.title || '');
-  const thumbnail = escapeXml(row.thumbnail);
+  // Prefer the video block's own poster image; fall back to the page image.
+  const rawThumbnail = row.videothumbnail || row.image;
+  const thumbnail = rawThumbnail ? escapeXml(new URL(rawThumbnail, loc).href) : '';
   const duration = parseInt(row.duration, 10);
   const publicationDate = toIsoDate(row.releasedate || row.lastModified);
 
@@ -71,7 +73,9 @@ async function main() {
   }
   const { data } = await res.json();
 
-  const videoRows = data.filter((row) => row.videourl && row.thumbnail);
+  // Only pages that actually have a video-feature block with a link count as
+  // having a video (a page's og-style metadata alone is not enough).
+  const videoRows = data.filter((row) => row.videourl);
   const entries = videoRows.map(buildEntry).join('\n');
 
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
