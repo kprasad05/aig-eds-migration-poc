@@ -31,12 +31,15 @@ indices:
       description:
         select: head > meta[name="description"]
         value: attribute(el, "content")
-      thumbnail:
+      image:
         select: head > meta[property="og:image"]
         value: attribute(el, "content")
       videourl:
-        select: head > meta[property="og:video"], head > meta[name="og:video"]
-        value: attribute(el, "content")
+        select: main .video-feature a
+        value: attribute(el, "href")
+      videothumbnail:
+        select: main .video-feature img
+        value: attribute(el, "src")
       duration:
         select: head > meta[property="video:duration"], head > meta[name="video:duration"]
         value: attribute(el, "content")
