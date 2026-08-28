@@ -28,14 +28,23 @@ function toIsoDate(value) {
   return Number.isNaN(date.getTime()) ? '' : date.toISOString();
 }
 
+function isEmbedPlayerUrl(url) {
+  return /youtube\.com|youtu\.be|vimeo\.com/i.test(url);
+}
+
 function buildEntry(row) {
   const loc = `${host}${row.path}`;
   const title = escapeXml(row.title || row.path);
   const description = escapeXml(row.description || row.title || '');
   const thumbnail = escapeXml(row.thumbnail);
-  const contentLoc = escapeXml(row.videourl);
   const duration = parseInt(row.duration, 10);
   const publicationDate = toIsoDate(row.releasedate || row.lastModified);
+
+  // video-feature embeds YouTube/Vimeo links as a player, not a direct file,
+  // so those need player_loc rather than content_loc per Google's schema.
+  const locTag = isEmbedPlayerUrl(row.videourl)
+    ? `<video:player_loc allow_embed="yes">${escapeXml(row.videourl)}</video:player_loc>`
+    : `<video:content_loc>${escapeXml(row.videourl)}</video:content_loc>`;
 
   const durationTag = Number.isFinite(duration) && duration > 0
     ? `\n      <video:duration>${duration}</video:duration>`
@@ -50,7 +59,7 @@ function buildEntry(row) {
       <video:thumbnail_loc>${thumbnail}</video:thumbnail_loc>
       <video:title>${title}</video:title>
       <video:description>${description}</video:description>
-      <video:content_loc>${contentLoc}</video:content_loc>${durationTag}${publicationDateTag}
+      ${locTag}${durationTag}${publicationDateTag}
     </video:video>
   </url>`;
 }
