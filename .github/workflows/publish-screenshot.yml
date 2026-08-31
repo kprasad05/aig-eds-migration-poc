@@ -1,17 +1,43 @@
 name: Publish Screenshot POC
 on:
+  workflow_dispatch:
   repository_dispatch:
     types: [resource-published]
 
 jobs:
-  log-event:
+  screenshot:
     runs-on: ubuntu-latest
     steps:
-      - name: Confirm trigger fired
-        run: echo "✅ Publish event received!"
-
       - name: Show payload
         run: echo '${{ toJSON(github.event.client_payload) }}'
 
-      - name: Show full event context
-        run: echo '${{ toJSON(github.event) }}'
+      - name: Build page URL
+        id: build_url
+        run: |
+          PAGE_PATH="${{ github.event.client_payload.path }}"
+          ORG="${{ github.event.client_payload.org }}"
+          SITE="${{ github.event.client_payload.site }}"
+
+          if [ -z "$PAGE_PATH" ]; then
+            PAGE_PATH="/"
+          fi
+
+          # strip .md and trailing "home" the way EDS does, minimal version:
+          PAGE_PATH="${PAGE_PATH%.md}"
+
+          PAGE_URL="https://main--${SITE}--${ORG}.aem.page${PAGE_PATH}"
+          echo "page_url=$PAGE_URL" >> "$GITHUB_OUTPUT"
+          echo "Resolved page URL: $PAGE_URL"
+
+      - name: Call Microlink screenshot API
+        id: microlink
+        run: |
+          curl -s "https://api.microlink.io/?url=${{ steps.build_url.outputs.page_url }}&screenshot=true&meta=false" \
+            -o response.json
+          cat response.json
+
+      - name: Extract screenshot URL
+        run: |
+          SCREENSHOT_URL=$(jq -r '.data.screenshot.url' response.json)
+          echo "✅ Screenshot stored at: $SCREENSHOT_URL"
+          echo "screenshot_url=$SCREENSHOT_URL" >> "$GITHUB_STEP_SUMMARY"
