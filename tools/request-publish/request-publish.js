@@ -33,10 +33,12 @@ function renderLinkRow(container, label, url) {
 
 (async function init() {
   const { context } = await DA_SDK;
-  const { org, site, path, ref } = context;
+  const {
+    org, repo, path, ref,
+  } = context;
 
   const { diffSiteUrl, previewUrl, liveUrl } = buildDiffLinks({
-    org, site, path, ref,
+    org, site: repo, path, ref,
   });
 
   const container = document.createElement("div");
