@@ -1,0 +1,17 @@
+name: Publish Screenshot POC
+on:
+  repository_dispatch:
+    types: [resource-published]
+
+jobs:
+  log-event:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm trigger fired
+        run: echo "✅ Publish event received!"
+
+      - name: Show payload
+        run: echo '${{ toJSON(github.event.client_payload) }}'
+
+      - name: Show full event context
+        run: echo '${{ toJSON(github.event) }}'
