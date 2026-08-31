@@ -8,9 +8,9 @@ const DIFF_SITE_URL = 'https://pianomister.github.io/diffsite/';
 export function buildDiffLinks({
   org, site, path, ref = 'main',
 }) {
-  return {
-    diffSiteUrl: DIFF_SITE_URL,
-    previewUrl: `https://${ref}--${site}--${org}.aem.page${path}`,
-    liveUrl: `https://${ref}--${site}--${org}.aem.live${path}`,
-  };
+  const previewUrl = `https://${ref}--${site}--${org}.aem.page${path}`;
+  const liveUrl = `https://${ref}--${site}--${org}.aem.live${path}`;
+  const diffSiteUrl = `${DIFF_SITE_URL}?url1=${encodeURIComponent(previewUrl)}&url2=${encodeURIComponent(liveUrl)}`;
+
+  return { diffSiteUrl, previewUrl, liveUrl };
 }

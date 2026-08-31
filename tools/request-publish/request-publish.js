@@ -46,9 +46,10 @@ function renderLinkRow(container, label, url) {
 
   const intro = document.createElement("p");
   intro.className = "intro";
-  intro.innerHTML = `Compare the preview and live versions of this page on the <a href="${diffSiteUrl}" target="_blank" rel="noopener noreferrer">diff checker site</a>.`;
+  intro.textContent = "Compare the preview and live versions of this page:";
   container.append(intro);
 
+  renderLinkRow(container, "Diff", diffSiteUrl);
   renderLinkRow(container, "Preview", previewUrl);
   renderLinkRow(container, "Live", liveUrl);
 
