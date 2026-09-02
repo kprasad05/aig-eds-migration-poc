@@ -2,6 +2,47 @@ import { getMetadata } from '../../scripts/aem.js';
 import { loadFragment } from '../fragment/fragment.js';
 
 const isDesktop = window.matchMedia('(min-width: 900px)');
+const DYNAMIC_NAV_LIMIT = 10;
+
+/**
+ * Expands nav links ending in "/*" (e.g. /home/newsroom/stories/*) into a
+ * live list of matching pages from query-index.json, newest first, so
+ * authors don't have to hand-maintain a list of articles in the nav doc.
+ * @param {Element} nav The decorated nav element
+ */
+async function expandDynamicNavLinks(nav) {
+  const dynamicLinks = [...nav.querySelectorAll('a[href$="/*"]')];
+  if (dynamicLinks.length === 0) return;
+
+  let pages;
+  try {
+    const res = await fetch('/query-index.json');
+    if (!res.ok) return;
+    ({ data: pages } = await res.json());
+  } catch {
+    return;
+  }
+
+  dynamicLinks.forEach((link) => {
+    const prefix = link.getAttribute('href').slice(0, -2);
+    const matches = pages
+      .filter((p) => p.path.startsWith(`${prefix}/`))
+      .sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0))
+      .slice(0, DYNAMIC_NAV_LIMIT);
+
+    const li = link.closest('li');
+    if (!li || matches.length === 0) return;
+    const items = matches.map((p) => {
+      const item = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = p.path;
+      a.textContent = p.title || p.path;
+      item.append(a);
+      return item;
+    });
+    li.replaceWith(...items);
+  });
+}
 
 function closeAllFlyouts(nav) {
   nav.querySelectorAll('.nav-item[aria-expanded="true"]').forEach((li) => {
@@ -30,6 +71,7 @@ export default async function decorate(block) {
   nav.id = 'nav';
   nav.setAttribute('aria-label', 'Main navigation');
   while (fragment.firstElementChild) nav.append(fragment.firstElementChild);
+  await expandDynamicNavLinks(nav);
 
   const sections = ['brand', 'sections', 'tools'];
   sections.forEach((c, i) => {
