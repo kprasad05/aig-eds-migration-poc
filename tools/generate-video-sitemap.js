@@ -36,8 +36,11 @@ function buildEntry(row) {
   const loc = `${host}${row.path}`;
   const title = escapeXml(row.title || row.path);
   const description = escapeXml(row.description || row.title || '');
-  // Prefer the video block's own poster image; fall back to the page image.
-  const rawThumbnail = row.videothumbnail || row.image;
+  // Prefer the video block's own poster image, then the page image. The
+  // legacy `thumbnail` field is a fallback for a known reindex gap where
+  // `image` is blank for some already-indexed rows; safe to drop once the
+  // index is confirmed to repopulate `image` for all rows.
+  const rawThumbnail = row.videothumbnail || row.image || row.thumbnail;
   const thumbnail = rawThumbnail ? escapeXml(new URL(rawThumbnail, loc).href) : '';
   const duration = parseInt(row.duration, 10);
   const publicationDate = toIsoDate(row.releasedate || row.lastModified);
