@@ -228,6 +228,12 @@ class PublishRequestsApp extends LitElement {
     }
 
     if (!this._org || !this._site) {
+      // Fall back to the DA context (current org/site) to prefill the input,
+      // but still require the user to submit
+      const { org, repo: site } = this.context || {};
+      if (org && site) {
+        this._orgSiteValue = `/${org}/${site}`;
+      }
       this._state = 'idle';
       return;
     }
