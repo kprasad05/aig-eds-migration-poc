@@ -196,10 +196,6 @@ class RequestForPublishAigPlugin extends LitElement {
       return;
     }
 
-    const adaScanInput = this.shadowRoot.querySelector('#ada-scan-link');
-    const adaScanLink = (adaScanInput?.value ?? '').trim();
-    const fullComment = adaScanLink ? `ADA scan report: ${adaScanLink}${comment ? `\n\n${comment}` : ''}` : comment;
-
     const authorEmail = this._userEmail;
     if (!authorEmail) {
       this._isSubmitting = false;
@@ -224,6 +220,10 @@ class RequestForPublishAigPlugin extends LitElement {
         console.log('[Request Publish AIG Plugin] Link to API response:', apiUrl);
       })
       .catch((error) => console.error('[Request Publish AIG Plugin] Error calling API:', error));
+
+    const commentParts = [`API test link: ${apiUrl}`];
+    if (comment) commentParts.push(comment);
+    const fullComment = commentParts.join('\n\n');
 
     // Preview content first so .aem.page is up to date for approvers
     this._submitPhase = 'previewing';
@@ -474,15 +474,6 @@ class RequestForPublishAigPlugin extends LitElement {
             </ul>
           ` : nothing}
         </section>
-
-        <div class="form-group">
-          <label for="ada-scan-link">ADA scan report link</label>
-          <sl-textfield
-            id="ada-scan-link"
-            type="url"
-            placeholder="https://..."
-          ></sl-textfield>
-        </div>
 
         <div class="form-group">
           <label for="comment">Please provide a description of your website content changes and reason for the content update.${this._commentsRequired ? html` <span class="required-marker">*</span>` : nothing}</label>

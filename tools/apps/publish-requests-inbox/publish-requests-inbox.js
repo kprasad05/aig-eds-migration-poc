@@ -68,6 +68,16 @@ function sampleRUM(checkpoint, data = {}) {
   } catch { /* noop */ }
 }
 
+/** Render comment text as plain segments with any URLs turned into clickable links. */
+function linkifyComment(text) {
+  const parts = (text || '').split(/(https?:\/\/\S+)/g);
+  return parts.map((part) => (
+    /^https?:\/\//.test(part)
+      ? html`<a href="${part}" target="_blank" rel="noopener" class="action-link">${part}</a>`
+      : part
+  ));
+}
+
 /** Parse `org/site` or `/org/site/` into `{ org, site }`. Returns null if invalid. */
 function parseOrgSitePath(raw) {
   const normalized = (raw || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
@@ -154,6 +164,12 @@ class PublishRequestsApp extends LitElement {
   get liveUrl() {
     const path = this._path?.replace(/\/index$/, '') || '';
     return `https://${this._liveHost}${path}`;
+  }
+
+  get adaScanUrl() {
+    // Dummy ADA scan link — page title passed as a query param
+    const page = this._path?.split('/').pop() || '';
+    return `https://ada-scan.example.com/scan?page=${encodeURIComponent(page)}`;
   }
 
   get diffUrl() {
@@ -834,7 +850,7 @@ class PublishRequestsApp extends LitElement {
           ${request.comment ? html`
             <div class="inbox-item-detail-row">
               <span class="detail-label">Message</span>
-              <span class="detail-value">${request.comment}</span>
+              <span class="detail-value">${linkifyComment(request.comment)}</span>
             </div>
           ` : nothing}
         </div>
@@ -920,7 +936,7 @@ class PublishRequestsApp extends LitElement {
           ${request.comment ? html`
             <div class="inbox-item-detail-row">
               <span class="detail-label">Message</span>
-              <span class="detail-value">${request.comment}</span>
+              <span class="detail-value">${linkifyComment(request.comment)}</span>
             </div>
           ` : nothing}
         </div>
@@ -1096,7 +1112,7 @@ class PublishRequestsApp extends LitElement {
             ${this._comment ? html`
               <div class="detail-row">
                 <dt>Author's note</dt>
-                <dd class="detail-comment"><code>${this._comment}</code></dd>
+                <dd class="detail-comment"><code>${linkifyComment(this._comment)}</code></dd>
               </div>
             ` : nothing}
             ${this._previewUrl ? html`
@@ -1111,6 +1127,15 @@ class PublishRequestsApp extends LitElement {
               </div>
             ` : nothing}
           </dl>
+        </section>
+
+        <section class="review-card">
+          <h3 class="review-card-title">Accessibility Scan</h3>
+          <p class="review-card-body">Review the ADA scan report for this page before publishing.</p>
+          <a href="${this.adaScanUrl}" target="_blank" rel="noopener" class="action-link">
+            <svg class="action-icon" viewBox="0 0 18 18"><path d="M9 1a8 8 0 1 0 8 8 8 8 0 0 0-8-8Zm0 15a7 7 0 1 1 7-7 7 7 0 0 1-7 7Z"/><path d="M9 4a1 1 0 0 0-1 1v4a1 1 0 0 0 .553.894l3 1.5a1 1 0 0 0 .894-1.788L10 8.382V5a1 1 0 0 0-1-1Z"/></svg>
+            View ADA Scan Report
+          </a>
         </section>
 
         <section class="review-card">
