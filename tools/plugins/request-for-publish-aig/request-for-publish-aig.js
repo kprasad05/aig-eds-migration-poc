@@ -537,6 +537,26 @@ customElements.define('request-for-publish-aig', RequestForPublishAigPlugin);
 
     const { org, repo: site, path } = context;
 
+    // Quick sanity check call to a free public API
+    const page = path.split('/').pop();
+    const params = new URLSearchParams({
+      current_time: new Date().toISOString(),
+      page,
+    });
+
+    fetch(`https://httpbin.org/get?${params.toString()}`)
+      .then((response) => response.json())
+      .then((apiData) => {
+        console.log('[Request Publish AIG Plugin] API responded with:', apiData);
+
+        // Turn the response into a downloadable link and log it instead of
+        // appending it to the page.
+        const blob = new Blob([JSON.stringify(apiData, null, 2)], { type: 'application/json' });
+        const fileUrl = URL.createObjectURL(blob);
+        console.log('[Request Publish AIG Plugin] Download link for API response:', fileUrl);
+      })
+      .catch((error) => console.error('[Request Publish AIG Plugin] Error calling API:', error));
+
     // Create and append the component
     const cmp = document.createElement('request-for-publish-aig');
     cmp.context = context;
