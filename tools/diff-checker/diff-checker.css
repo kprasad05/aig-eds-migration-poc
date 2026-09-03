@@ -6,13 +6,13 @@ body {
   color: #2c2c2c;
 }
 
-.request-publish .intro {
+.diff-checker .intro {
   margin: 0 0 16px 0;
   font-size: 14px;
   line-height: 1.4;
 }
 
-.request-publish .link-row {
+.diff-checker .link-row {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -23,7 +23,7 @@ body {
   overflow-wrap: break-word;
 }
 
-.request-publish .link-label {
+.diff-checker .link-label {
   flex: 0 0 auto;
   font-weight: 700;
   font-size: 12px;
@@ -31,7 +31,7 @@ body {
   letter-spacing: 0.03em;
 }
 
-.request-publish .link-url {
+.diff-checker .link-url {
   flex: 1 1 auto;
   font-size: 14px;
   color: #1473e6;
@@ -39,7 +39,7 @@ body {
   word-break: break-all;
 }
 
-.request-publish .copy-button {
+.diff-checker .copy-button {
   flex: 0 0 auto;
   padding: 4px 10px;
   border: 1px solid #ccc;
@@ -49,6 +49,6 @@ body {
   cursor: pointer;
 }
 
-.request-publish .copy-button:hover {
+.diff-checker .copy-button:hover {
   background: #f5f5f5;
 }

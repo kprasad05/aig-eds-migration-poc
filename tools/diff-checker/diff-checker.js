@@ -42,7 +42,7 @@ function renderLinkRow(container, label, url) {
   });
 
   const container = document.createElement("div");
-  container.className = "request-publish";
+  container.className = "diff-checker";
 
   const intro = document.createElement("p");
   intro.className = "intro";
