@@ -60,7 +60,7 @@ function sampleRUM(checkpoint, data = {}) {
   } catch { /* noop */ }
 }
 
-class RequestForPublishAdaPlugin extends LitElement {
+class RequestForPublishAigPlugin extends LitElement {
   static properties = {
     context: { attribute: false },
     path: { attribute: false },
@@ -178,7 +178,7 @@ class RequestForPublishAdaPlugin extends LitElement {
     // Sample RUM enhancer if the RUM script is loaded
     window.hlx?.rum?.sampleRUM?.enhance?.();
 
-    sampleRUM('request-for-publish-ada:loaded', { source: this.contentPath });
+    sampleRUM('request-for-publish-aig:loaded', { source: this.contentPath });
     this._isLoading = false;
   }
 
@@ -514,39 +514,39 @@ class RequestForPublishAdaPlugin extends LitElement {
   }
 }
 
-customElements.define('request-for-publish-ada', RequestForPublishAdaPlugin);
+customElements.define('request-for-publish-aig', RequestForPublishAigPlugin);
 
 /**
  * Self-initialize when loaded as HTML (fullsize-dialog mode)
  * This runs when the script is loaded directly via the HTML file
  */
 (async function initAsDialog() {
-  console.log('[Request Publish ADA Plugin] Initializing...');
+  console.log('[Request Publish AIG Plugin] Initializing...');
 
   // Only run if we're in a browser context with a body
   if (typeof window === 'undefined' || !document.body) {
-    console.log('[Request Publish ADA Plugin] No window or body, skipping');
+    console.log('[Request Publish AIG Plugin] No window or body, skipping');
     return;
   }
 
   try {
     // Wait for DA SDK
-    console.log('[Request Publish ADA Plugin] Waiting for DA SDK...');
+    console.log('[Request Publish AIG Plugin] Waiting for DA SDK...');
     const { context, token } = await DA_SDK;
-    console.log('[Request Publish ADA Plugin] Got SDK context:', context);
+    console.log('[Request Publish AIG Plugin] Got SDK context:', context);
 
     const { org, repo: site, path } = context;
 
     // Create and append the component
-    const cmp = document.createElement('request-for-publish-ada');
+    const cmp = document.createElement('request-for-publish-aig');
     cmp.context = context;
     cmp.path = `/${org}/${site}${path}`;
     cmp.token = token;
 
-    console.log('[Request Publish ADA Plugin] Appending component to body');
+    console.log('[Request Publish AIG Plugin] Appending component to body');
     document.body.append(cmp);
   } catch (error) {
-    console.error('[Request Publish ADA Plugin] Initialization error:', error);
+    console.error('[Request Publish AIG Plugin] Initialization error:', error);
   }
 }());
 
@@ -557,12 +557,12 @@ customElements.define('request-for-publish-ada', RequestForPublishAdaPlugin);
  */
 export default async function init({ context, token }) {
   return {
-    title: 'Request Publish (ADA)',
+    title: 'Request Publish (AIG)',
     searchEnabled: false,
     panel: {
       render: (container) => {
         const { org, repo: site, path } = context;
-        const cmp = document.createElement('request-for-publish-ada');
+        const cmp = document.createElement('request-for-publish-aig');
         cmp.context = context;
         cmp.path = `/${org}/${site}${path}`;
         cmp.token = token;
