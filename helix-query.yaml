@@ -20,6 +20,9 @@ indices:
       robots:
         select: head > meta[name="robots"]
         value: attribute(el, "content")
+      hidenav:
+        select: head > meta[name="hidenav"]
+        value: attribute(el, "content")
   video-index:
     include:
       - '/**'
