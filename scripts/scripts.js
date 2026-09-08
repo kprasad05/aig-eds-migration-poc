@@ -223,6 +223,10 @@ async function loadLazy(doc) {
 
   loadCSS(`${window.hlx.codeBasePath}/styles/lazy-styles.css`);
   loadFonts();
+
+  if (window.location.href.includes('.aem.page')) {
+    import('../tools/sidekick/aem-sites-optimizer-preflight.js');
+  }
 }
 
 /**
