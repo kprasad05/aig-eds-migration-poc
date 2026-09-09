@@ -44,6 +44,7 @@ function buildEntry(row) {
   const thumbnail = rawThumbnail ? escapeXml(new URL(rawThumbnail, loc).href) : '';
   const duration = parseInt(row.duration, 10);
   const publicationDate = toIsoDate(row.releasedate || row.lastModified);
+  const expirationDate = toIsoDate(row.expirationdate);
 
   // video-feature embeds YouTube/Vimeo links as a player, not a direct file,
   // so those need player_loc rather than content_loc per Google's schema.
@@ -57,6 +58,9 @@ function buildEntry(row) {
   const publicationDateTag = publicationDate
     ? `\n      <video:publication_date>${publicationDate}</video:publication_date>`
     : '';
+  const expirationDateTag = expirationDate
+    ? `\n      <video:expiration_date>${expirationDate}</video:expiration_date>`
+    : '';
 
   return `  <url>
     <loc>${escapeXml(loc)}</loc>
@@ -64,7 +68,7 @@ function buildEntry(row) {
       <video:thumbnail_loc>${thumbnail}</video:thumbnail_loc>
       <video:title>${title}</video:title>
       <video:description>${description}</video:description>
-      ${locTag}${durationTag}${publicationDateTag}
+      ${locTag}${durationTag}${publicationDateTag}${expirationDateTag}
     </video:video>
   </url>`;
 }

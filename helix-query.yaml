@@ -23,6 +23,29 @@ indices:
       hidenav:
         select: head > meta[name="hidenav"]
         value: attribute(el, "content")
+  article-index:
+    include:
+      - '/**'
+    target: /article-index.json
+    properties:
+      title:
+        select: head > meta[property="og:title"]
+        value: attribute(el, "content")
+      description:
+        select: head > meta[name="description"]
+        value: attribute(el, "content")
+      template:
+        select: head > meta[name="template"]
+        value: attribute(el, "content")
+      publishdate:
+        select: head > meta[name="publishdate"]
+        value: attribute(el, "content")
+      lastModified:
+        select: none
+        value: parseTimestamp(headers["last-modified"], "ddd, DD MMM YYYY hh:mm:ss GMT")
+      robots:
+        select: head > meta[name="robots"]
+        value: attribute(el, "content")
   video-index:
     include:
       - '/**'
@@ -48,6 +71,9 @@ indices:
         value: attribute(el, "content")
       releasedate:
         select: head > meta[property="video:release_date"], head > meta[name="video:release_date"]
+        value: attribute(el, "content")
+      expirationdate:
+        select: head > meta[property="video:expiration_date"], head > meta[name="video:expiration_date"]
         value: attribute(el, "content")
       lastModified:
         select: none
