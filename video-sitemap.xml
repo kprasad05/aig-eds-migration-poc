@@ -22,8 +22,8 @@
   <url>
     <loc>https://main--aig-eds-migration-poc--kprasad05.aem.live/drafts/purush/sitemap-testing</loc>
     <video:video>
-      <video:title>Video Feature</video:title>
-      <video:description>Video Feature</video:description>
+      <video:title>testing video feature - heading</video:title>
+      <video:description>testing video feature - heading</video:description>
       <video:content_loc>https://www.media.aig.com/is/content/aigmedia/aig/america-canada/us/videos/high-res/tradenable-navigating-the-broker-space.mp4</video:content_loc>
       <video:thumbnail_loc>https://main--aig-eds-migration-poc--kprasad05.aem.live/default-meta-image.png?width=1200&amp;format=pjpg&amp;optimize=medium</video:thumbnail_loc>
     </video:video>
@@ -32,7 +32,7 @@
     <loc>https://main--aig-eds-migration-poc--kprasad05.aem.live/drafts/dorothy/test-video</loc>
     <video:video>
       <video:title>Video Feature</video:title>
-      <video:description>Video Feature</video:description>
+      <video:description>testing video feature - heading testing video feature - description</video:description>
       <video:content_loc>https://www.media.aig.com/is/content/aigmedia/aig/america-canada/us/videos/high-res/tradenable-portal-navigating-the-portal.mp4</video:content_loc>
       <video:thumbnail_loc>https://main--aig-eds-migration-poc--kprasad05.aem.live/default-meta-image.png?width=1200&amp;format=pjpg&amp;optimize=medium</video:thumbnail_loc>
     </video:video>
