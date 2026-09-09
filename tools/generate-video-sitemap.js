@@ -22,12 +22,6 @@ function escapeXml(value) {
     .replace(/'/g, '&apos;');
 }
 
-function toIsoDate(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : date.toISOString();
-}
-
 function isEmbedPlayerUrl(url) {
   return /youtube\.com|youtu\.be|vimeo\.com/i.test(url);
 }
@@ -42,8 +36,6 @@ function buildEntry(row) {
   // index is confirmed to repopulate `image` for all rows.
   const rawThumbnail = row.videothumbnail || row.image || row.thumbnail;
   const thumbnail = rawThumbnail ? escapeXml(new URL(rawThumbnail, loc).href) : '';
-  const duration = parseInt(row.duration, 10);
-  const publicationDate = toIsoDate(row.releasedate || row.lastModified);
 
   // video-feature embeds YouTube/Vimeo links as a player, not a direct file,
   // so those need player_loc rather than content_loc per Google's schema.
@@ -51,20 +43,13 @@ function buildEntry(row) {
     ? `<video:player_loc allow_embed="yes">${escapeXml(row.videourl)}</video:player_loc>`
     : `<video:content_loc>${escapeXml(row.videourl)}</video:content_loc>`;
 
-  const durationTag = Number.isFinite(duration) && duration > 0
-    ? `\n      <video:duration>${duration}</video:duration>`
-    : '';
-  const publicationDateTag = publicationDate
-    ? `\n      <video:publication_date>${publicationDate}</video:publication_date>`
-    : '';
-
   return `  <url>
     <loc>${escapeXml(loc)}</loc>
     <video:video>
-      <video:thumbnail_loc>${thumbnail}</video:thumbnail_loc>
       <video:title>${title}</video:title>
       <video:description>${description}</video:description>
-      ${locTag}${durationTag}${publicationDateTag}
+      ${locTag}
+      <video:thumbnail_loc>${thumbnail}</video:thumbnail_loc>
     </video:video>
   </url>`;
 }
@@ -81,9 +66,9 @@ async function main() {
   const videoRows = data.filter((row) => row.videourl);
   const entries = videoRows.map(buildEntry).join('\n');
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+  const xml = `<?xml version="1.0"?>
+<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:video="https://www.google.com/schemas/sitemap-video/1.1">
 ${entries}
 </urlset>
 `;
