@@ -1,0 +1,74 @@
+version: 1
+indices:
+  query-index:
+    include:
+      - '/**'
+    target: /query-index.json
+    properties:
+      title:
+        select: head > meta[property="og:title"]
+        value: attribute(el, "content")
+      description:
+        select: head > meta[name="description"]
+        value: attribute(el, "content")
+      image:
+        select: head > meta[property="og:image"]
+        value: attribute(el, "content")
+      lastModified:
+        select: none
+        value: parseTimestamp(headers["last-modified"], "ddd, DD MMM YYYY hh:mm:ss GMT")
+      robots:
+        select: head > meta[name="robots"]
+        value: attribute(el, "content")
+      hidenav:
+        select: head > meta[name="hidenav"]
+        value: attribute(el, "content")
+  article-index:
+    include:
+      - '/**'
+    target: /article-index.json
+    properties:
+      title:
+        select: head > meta[property="og:title"]
+        value: attribute(el, "content")
+      description:
+        select: head > meta[name="description"]
+        value: attribute(el, "content")
+      template:
+        select: head > meta[name="template"]
+        value: attribute(el, "content")
+      publishdate:
+        select: head > meta[name="publishdate"]
+        value: attribute(el, "content")
+      lastModified:
+        select: none
+        value: parseTimestamp(headers["last-modified"], "ddd, DD MMM YYYY hh:mm:ss GMT")
+      robots:
+        select: head > meta[name="robots"]
+        value: attribute(el, "content")
+  video-index:
+    include:
+      - '/**'
+    target: /video-index.json
+    properties:
+      title:
+        select: head > meta[property="og:title"]
+        value: attribute(el, "content")
+      description:
+        select: head > meta[name="description"]
+        value: attribute(el, "content")
+      image:
+        select: head > meta[property="og:image"]
+        value: attribute(el, "content")
+      videourl:
+        select: main .video-feature a
+        value: attribute(el, "href")
+      videothumbnail:
+        select: main .video-feature img
+        value: attribute(el, "src")
+      lastModified:
+        select: none
+        value: parseTimestamp(headers["last-modified"], "ddd, DD MMM YYYY hh:mm:ss GMT")
+      robots:
+        select: head > meta[name="robots"]
+        value: attribute(el, "content")

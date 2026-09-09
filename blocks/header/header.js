@@ -2,6 +2,95 @@ import { getMetadata } from '../../scripts/aem.js';
 import { loadFragment } from '../fragment/fragment.js';
 
 const isDesktop = window.matchMedia('(min-width: 900px)');
+const DYNAMIC_NAV_LIMIT = 10;
+
+/**
+ * Strips a trailing slash so folder-index paths ("/foo/") and leaf paths
+ * ("/foo/bar") from query-index.json compare consistently with authored
+ * nav hrefs, which never include a trailing slash.
+ * @param {string} path
+ */
+function normalizePath(path) {
+  return path.length > 1 && path.endsWith('/') ? path.slice(0, -1) : path;
+}
+
+function isHiddenFromNav(entry) {
+  return /^(true|yes|1)$/i.test((entry?.hidenav || '').trim());
+}
+
+/**
+ * Fetches query-index.json once and returns both the raw rows (for dynamic
+ * link expansion) and the set of paths authors flagged with the "hidenav"
+ * page metadata (for pruning hidden pages out of the nav, whether they got
+ * there via an authored link or a dynamic "/*" expansion).
+ */
+async function fetchNavIndex() {
+  try {
+    const res = await fetch('/query-index.json');
+    if (!res.ok) return null;
+    const { data } = await res.json();
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Expands nav links ending in "/*" (e.g. /home/newsroom/stories/*) into a
+ * live list of matching pages from query-index.json, newest first, so
+ * authors don't have to hand-maintain a list of articles in the nav doc.
+ * Pages flagged "hidenav" are excluded from the expansion.
+ * @param {Element} nav The decorated nav element
+ * @param {Array} pages Rows from query-index.json
+ */
+function expandDynamicNavLinks(nav, pages) {
+  const dynamicLinks = [...nav.querySelectorAll('a[href$="/*"]')];
+  if (dynamicLinks.length === 0 || !pages) return;
+
+  dynamicLinks.forEach((link) => {
+    const prefix = link.getAttribute('href').slice(0, -2);
+    const matches = pages
+      .filter((p) => p.path.startsWith(`${prefix}/`) && !isHiddenFromNav(p))
+      .sort((a, b) => (b.lastModified || 0) - (a.lastModified || 0))
+      .slice(0, DYNAMIC_NAV_LIMIT);
+
+    const li = link.closest('li');
+    if (!li || matches.length === 0) return;
+    const items = matches.map((p) => {
+      const item = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = p.path;
+      a.textContent = p.title || p.path;
+      item.append(a);
+      return item;
+    });
+    li.replaceWith(...items);
+  });
+}
+
+/**
+ * Removes nav list items whose link points to a page flagged "hidenav",
+ * whether the link was authored directly or produced by dynamic expansion.
+ * External/absolute-origin links (e.g. tools links to other sites) are left
+ * alone since they're never in query-index.json.
+ * @param {Element} nav The decorated nav element
+ * @param {Array} pages Rows from query-index.json
+ */
+function removeHiddenNavLinks(nav, pages) {
+  if (!pages) return;
+  const hiddenPaths = new Set(
+    pages.filter(isHiddenFromNav).map((p) => normalizePath(p.path)),
+  );
+  if (hiddenPaths.size === 0) return;
+
+  nav.querySelectorAll('.nav-sections a[href], .nav-tools a[href]').forEach((a) => {
+    const url = new URL(a.getAttribute('href'), window.location.href);
+    if (url.origin !== window.location.origin) return;
+    if (hiddenPaths.has(normalizePath(url.pathname))) {
+      (a.closest('li') || a).remove();
+    }
+  });
+}
 
 function closeAllFlyouts(nav) {
   nav.querySelectorAll('.nav-item[aria-expanded="true"]').forEach((li) => {
@@ -22,7 +111,7 @@ function toggleMobileMenu(nav, forceClose) {
  */
 export default async function decorate(block) {
   const navMeta = getMetadata('nav');
-  const navPath = navMeta ? new URL(navMeta, window.location).pathname : '/content/nav';
+  const navPath = navMeta ? new URL(navMeta, window.location).pathname : '/nav';
   const fragment = await loadFragment(navPath);
 
   block.textContent = '';
@@ -30,6 +119,9 @@ export default async function decorate(block) {
   nav.id = 'nav';
   nav.setAttribute('aria-label', 'Main navigation');
   while (fragment.firstElementChild) nav.append(fragment.firstElementChild);
+  const pages = await fetchNavIndex();
+  expandDynamicNavLinks(nav, pages);
+  removeHiddenNavLinks(nav, pages);
 
   const sections = ['brand', 'sections', 'tools'];
   sections.forEach((c, i) => {
