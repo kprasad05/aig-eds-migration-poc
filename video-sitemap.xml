@@ -1,26 +1,22 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
-        xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">
+<?xml version="1.0"?>
+<urlset xmlns="https://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:video="https://www.google.com/schemas/sitemap-video/1.1">
   <url>
     <loc>https://main--aig-eds-migration-poc--kprasad05.aem.live/drafts/purush/video</loc>
     <video:video>
-      <video:thumbnail_loc>https://main--aig-eds-migration-poc--kprasad05.aem.live/default-meta-image.png?width=1200&amp;format=pjpg&amp;optimize=medium</video:thumbnail_loc>
-      <video:title>President and CEO Eric Andersen Affirms AIG’s Strategy in Message to Clients and Partners</video:title>
+      <video:title>test - hide nav -President and CEO Eric Andersen Affirms AIG’s Strategy in Message to Clients and Partners</video:title>
       <video:description>Eric Andersen discusses opportunities for AIG’s next chapter in support of our valued clients and trusted partners.</video:description>
       <video:player_loc allow_embed="yes">https://www.youtube.com/watch?v=hTifKRFInzI</video:player_loc>
-      <video:duration>185</video:duration>
-      <video:publication_date>2026-08-01T00:00:00.000Z</video:publication_date>
+      <video:thumbnail_loc>https://main--aig-eds-migration-poc--kprasad05.aem.live/default-meta-image.png?width=1200&amp;format=pjpg&amp;optimize=medium</video:thumbnail_loc>
     </video:video>
   </url>
   <url>
     <loc>https://main--aig-eds-migration-poc--kprasad05.aem.live/drafts/purush/test</loc>
     <video:video>
-      <video:thumbnail_loc>https://main--aig-eds-migration-poc--kprasad05.aem.live/default-meta-image.png?width=1200&amp;format=pjpg&amp;optimize=medium</video:thumbnail_loc>
       <video:title>Testing President and CEO Eric Andersen Affirms AIG’s Strategy in Message to Clients and Partners</video:title>
       <video:description>Eric Andersen discusses opportunities for AIG’s next chapter in support of our valued clients and trusted partners.</video:description>
       <video:player_loc allow_embed="yes">https://www.youtube.com/watch?v=hTifKRFInzI</video:player_loc>
-      <video:duration>185</video:duration>
-      <video:publication_date>2026-08-01T00:00:00.000Z</video:publication_date>
+      <video:thumbnail_loc>https://main--aig-eds-migration-poc--kprasad05.aem.live/default-meta-image.png?width=1200&amp;format=pjpg&amp;optimize=medium</video:thumbnail_loc>
     </video:video>
   </url>
 </urlset>
