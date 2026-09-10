@@ -196,6 +196,11 @@ class RequestForPublishAigPlugin extends LitElement {
       return;
     }
 
+    const workflowTitle = (this.shadowRoot.querySelector('#workflowTitle')?.value ?? '').trim();
+    const complianceSystemId = (this.shadowRoot.querySelector('#complianceSystemId')?.value ?? '').trim();
+    const complianceSystemName = (this.shadowRoot.querySelector('#complianceSystemName')?.value ?? '').trim();
+    const changeType = (this.shadowRoot.querySelector('#changeType')?.value ?? '').trim();
+
     const authorEmail = this._userEmail;
     if (!authorEmail) {
       this._isSubmitting = false;
@@ -221,7 +226,15 @@ class RequestForPublishAigPlugin extends LitElement {
       })
       .catch((error) => console.error('[Request Publish AIG Plugin] Error calling API:', error));
 
+    const complianceDetails = [
+      workflowTitle && `Workflow Title: ${workflowTitle}`,
+      complianceSystemId && `Compliance System ID: ${complianceSystemId}`,
+      complianceSystemName && `Compliance System Name: ${complianceSystemName}`,
+      changeType && `Change Type: ${changeType}`,
+    ].filter(Boolean).join('\n');
+
     const commentParts = [`API test link: ${apiUrl}`];
+    if (complianceDetails) commentParts.push(complianceDetails);
     if (comment) commentParts.push(comment);
     const fullComment = commentParts.join('\n\n');
 
@@ -473,6 +486,33 @@ class RequestForPublishAigPlugin extends LitElement {
               ${this._cc.map((email) => html`<li><code>${email}</code></li>`)}
             </ul>
           ` : nothing}
+        </section>
+
+        <section class="review-card">
+          <h4 class="review-card-title">Compliance Details</h4>
+          <div class="form-group">
+            <label for="workflowTitle">Workflow Title</label>
+            <sl-input id="workflowTitle" placeholder="e.g. Q3 Product Page Refresh"></sl-input>
+          </div>
+          <div class="form-group">
+            <label for="complianceSystemId">Compliance System ID</label>
+            <sl-input id="complianceSystemId" placeholder="e.g. CMP-12345"></sl-input>
+          </div>
+          <div class="form-group">
+            <label for="complianceSystemName">Compliance System Name</label>
+            <sl-input id="complianceSystemName" placeholder="e.g. Compliance Tracker"></sl-input>
+          </div>
+          <div class="form-group">
+            <label for="changeType">Change Type</label>
+            <select id="changeType" class="pw-select">
+              <option value="" selected disabled>Select a change type</option>
+              <option value="Material Change Requiring Legal/Compliance Approval">Material Change Requiring Legal/Compliance Approval</option>
+              <option value="Non-Material Content Update">Non-Material Content Update</option>
+              <option value="Cosmetic/Editorial Change">Cosmetic/Editorial Change</option>
+              <option value="Regulatory/Policy Update">Regulatory/Policy Update</option>
+              <option value="Emergency/Urgent Fix">Emergency/Urgent Fix</option>
+            </select>
+          </div>
         </section>
 
         <div class="form-group">
