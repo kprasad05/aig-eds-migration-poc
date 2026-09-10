@@ -32,12 +32,30 @@ jobs:
       - name: Call Microlink screenshot API
         id: microlink
         run: |
-          curl -s "https://api.microlink.io/?url=${{ steps.build_url.outputs.page_url }}&screenshot=true&meta=false" \
+          curl -s "https://api.microlink.io/?url=${{ steps.build_url.outputs.page_url }}&screenshot=true&meta=true" \
             -o response.json
           cat response.json
 
-      - name: Extract screenshot URL
+      - name: Build output JSON
+        id: build_output
         run: |
-          SCREENSHOT_URL=$(jq -r '.data.screenshot.url' response.json)
-          echo "✅ Screenshot stored at: $SCREENSHOT_URL"
-          echo "screenshot_url=$SCREENSHOT_URL" >> "$GITHUB_STEP_SUMMARY"
+          PAGE_URL="${{ steps.build_url.outputs.page_url }}"
+          jq -n \
+            --arg pageTitle "$(jq -r '.data.title // empty' response.json)" \
+            --arg previewUrl "$PAGE_URL" \
+            '{"page-title": $pageTitle, "preview-url": $previewUrl}' \
+            > output.json
+
+          echo "Output JSON:"
+          cat output.json
+
+          echo "### Publish Screenshot Output" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat output.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+          {
+            echo "output_json<<EOF"
+            cat output.json
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
