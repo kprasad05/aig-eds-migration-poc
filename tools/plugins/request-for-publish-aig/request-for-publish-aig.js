@@ -492,19 +492,19 @@ class RequestForPublishAigPlugin extends LitElement {
           <h4 class="review-card-title">Compliance Details</h4>
           <div class="form-group">
             <label for="workflowTitle">Workflow Title</label>
-            <sl-input id="workflowTitle" placeholder="e.g. Q3 Product Page Refresh"></sl-input>
+            <sl-input id="workflowTitle" type="text" class="pw-compliance-input" placeholder="e.g. Q3 Product Page Refresh"></sl-input>
           </div>
           <div class="form-group">
             <label for="complianceSystemId">Compliance System ID</label>
-            <sl-input id="complianceSystemId" placeholder="e.g. CMP-12345"></sl-input>
+            <sl-input id="complianceSystemId" type="text" class="pw-compliance-input" placeholder="e.g. CMP-12345"></sl-input>
           </div>
           <div class="form-group">
             <label for="complianceSystemName">Compliance System Name</label>
-            <sl-input id="complianceSystemName" placeholder="e.g. Compliance Tracker"></sl-input>
+            <sl-input id="complianceSystemName" type="text" class="pw-compliance-input" placeholder="e.g. Compliance Tracker"></sl-input>
           </div>
           <div class="form-group">
             <label for="changeType">Change Type</label>
-            <select id="changeType" class="pw-select">
+            <select id="changeType" class="pw-select pw-compliance-input">
               <option value="" selected disabled>Select a change type</option>
               <option value="Material Change Requiring Legal/Compliance Approval">Material Change Requiring Legal/Compliance Approval</option>
               <option value="Non-Material Content Update">Non-Material Content Update</option>
