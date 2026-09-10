@@ -59,3 +59,30 @@ jobs:
             cat output.json
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Call test API with output JSON
+        id: call_api
+        run: |
+          PAGE_TITLE=$(jq -r '.["page-title"]' output.json)
+          PREVIEW_URL=$(jq -r '.["preview-url"]' output.json)
+
+          API_URL="https://httpbin.org/get?page-title=$(jq -rn --arg v "$PAGE_TITLE" '$v|@uri')&preview-url=$(jq -rn --arg v "$PREVIEW_URL" '$v|@uri')"
+
+          curl -s "$API_URL" -o api_response.json
+
+          echo "API responded with:"
+          cat api_response.json
+          echo "Link to API response: $API_URL"
+
+          echo "api_url=$API_URL" >> "$GITHUB_OUTPUT"
+
+          echo "### Test API Call" >> "$GITHUB_STEP_SUMMARY"
+          echo "**JSON input:**" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat output.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "**Link to API response:** $API_URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "**API response:**" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat api_response.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
