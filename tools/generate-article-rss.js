@@ -40,6 +40,15 @@ function toFeedDate(value) {
   return iso.replace('Z', '+0000');
 }
 
+// lastModified comes out of the index as a Unix timestamp in seconds, not
+// milliseconds like Date() expects, and only applies when no author-entered
+// publishdate exists.
+function resolvePubDate(row) {
+  if (row.publishdate) return toFeedDate(row.publishdate);
+  if (row.lastModified) return toFeedDate(row.lastModified * 1000);
+  return toFeedDate();
+}
+
 function isArticle(row) {
   const isArticleTemplate = (row.template || '').trim().toLowerCase() === ARTICLE_TEMPLATE.toLowerCase();
   const isUnderArticlesFolder = row.path.startsWith(ARTICLE_FOLDER);
@@ -50,7 +59,7 @@ function buildItem(row) {
   const link = `${host}${row.path}`;
   const title = escapeXml(row.title || row.path);
   const description = escapeXml(row.description || '');
-  const pubDate = toFeedDate(row.publishdate || row.lastModified);
+  const pubDate = resolvePubDate(row);
 
   return `\t<item>
 \t<title>${title}</title>
