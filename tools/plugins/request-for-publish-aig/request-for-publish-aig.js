@@ -80,6 +80,7 @@ class RequestForPublishAigPlugin extends LitElement {
     _commentsRequired: { state: true },
     _commentsMinLength: { state: true },
     _submitPhase: { state: true },
+    _complianceFiles: { state: true },
   };
 
   constructor() {
@@ -100,6 +101,7 @@ class RequestForPublishAigPlugin extends LitElement {
     this._commentsMinLength = 10;
     this._supportContact = '';
     this._submitPhase = '';
+    this._complianceFiles = [];
   }
 
   connectedCallback() {
@@ -182,6 +184,24 @@ class RequestForPublishAigPlugin extends LitElement {
     this._isLoading = false;
   }
 
+  handleComplianceFilesChange(event) {
+    const newFiles = Array.from(event.target.files || []);
+    if (newFiles.length === 0) return;
+    // Merge with any previously selected files, deduping by name + size.
+    const merged = [...this._complianceFiles];
+    newFiles.forEach((file) => {
+      const isDuplicate = merged.some((f) => f.name === file.name && f.size === file.size);
+      if (!isDuplicate) merged.push(file);
+    });
+    this._complianceFiles = merged;
+    // Reset the input so the same file can be re-selected after removal.
+    event.target.value = '';
+  }
+
+  handleRemoveComplianceFile(index) {
+    this._complianceFiles = this._complianceFiles.filter((_, i) => i !== index);
+  }
+
   async handleSubmit() {
     if (this._isSubmitting) return;
     this._isSubmitting = true;
@@ -197,6 +217,7 @@ class RequestForPublishAigPlugin extends LitElement {
     }
 
     const workflowTitle = (this.shadowRoot.querySelector('#workflowTitle')?.value ?? '').trim();
+    const workflowName = (this.shadowRoot.querySelector('#workflowName')?.value ?? '').trim();
     const complianceSystemId = (this.shadowRoot.querySelector('#complianceSystemId')?.value ?? '').trim();
     const complianceSystemName = (this.shadowRoot.querySelector('#complianceSystemName')?.value ?? '').trim();
     const changeType = (this.shadowRoot.querySelector('#changeType')?.value ?? '').trim();
@@ -226,11 +247,15 @@ class RequestForPublishAigPlugin extends LitElement {
       })
       .catch((error) => console.error('[Request Publish AIG Plugin] Error calling API:', error));
 
+    const complianceArtifactNames = this._complianceFiles.map((file) => file.name);
+
     const complianceDetails = [
       workflowTitle && `Workflow Title: ${workflowTitle}`,
+      workflowName && `Workflow Name: ${workflowName}`,
       complianceSystemId && `Compliance System ID: ${complianceSystemId}`,
       complianceSystemName && `Compliance System Name: ${complianceSystemName}`,
       changeType && `Change Type: ${changeType}`,
+      complianceArtifactNames.length > 0 && `Compliance Artifacts: ${complianceArtifactNames.join(', ')}`,
     ].filter(Boolean).join('\n');
 
     const commentParts = [`API test link: ${apiUrl}`];
@@ -495,6 +520,10 @@ class RequestForPublishAigPlugin extends LitElement {
             <sl-input id="workflowTitle" type="text" class="pw-compliance-input" placeholder="e.g. Q3 Product Page Refresh"></sl-input>
           </div>
           <div class="form-group">
+            <label for="workflowName">Workflow Name</label>
+            <sl-input id="workflowName" type="text" class="pw-compliance-input" placeholder="e.g. web-content-update"></sl-input>
+          </div>
+          <div class="form-group">
             <label for="complianceSystemId">Compliance System ID</label>
             <sl-input id="complianceSystemId" type="text" class="pw-compliance-input" placeholder="e.g. CMP-12345"></sl-input>
           </div>
@@ -512,6 +541,32 @@ class RequestForPublishAigPlugin extends LitElement {
               <option value="Regulatory/Policy Update">Regulatory/Policy Update</option>
               <option value="Emergency/Urgent Fix">Emergency/Urgent Fix</option>
             </select>
+          </div>
+          <div class="form-group">
+            <label for="complianceArtifacts">Compliance Artifacts</label>
+            <input
+              id="complianceArtifacts"
+              type="file"
+              class="pw-compliance-input pw-file-input"
+              multiple
+              @change=${(e) => this.handleComplianceFilesChange(e)}
+            />
+            <span class="field-hint">Attach supporting compliance documents (e.g. approvals, sign-offs).</span>
+            ${this._complianceFiles.length > 0 ? html`
+              <ul class="compliance-file-list">
+                ${this._complianceFiles.map((file, index) => html`
+                  <li class="compliance-file-item">
+                    <span class="compliance-file-name">${file.name}</span>
+                    <button
+                      type="button"
+                      class="compliance-file-remove"
+                      aria-label="Remove ${file.name}"
+                      @click=${() => this.handleRemoveComplianceFile(index)}
+                    >×</button>
+                  </li>
+                `)}
+              </ul>
+            ` : nothing}
           </div>
         </section>
 

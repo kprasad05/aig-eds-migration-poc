@@ -336,6 +336,52 @@ sl-button.pw-fill-negative::part(base):disabled {
   color: var(--s2-gray-700);
 }
 
+.pw-file-input {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  font-size: inherit;
+  color: var(--s2-gray-800);
+}
+
+.compliance-file-list {
+  list-style: none;
+  margin: var(--s2-spacing-100) 0 0;
+  padding: 0;
+  max-width: 320px;
+}
+
+.compliance-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s2-spacing-100);
+  padding: var(--s2-spacing-75) var(--s2-spacing-100);
+  border: 1px solid var(--s2-gray-200);
+  border-radius: var(--s2-corner-radius-100);
+  margin-bottom: var(--s2-spacing-75);
+}
+
+.compliance-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compliance-file-remove {
+  border: none;
+  background: none;
+  color: var(--s2-gray-700);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 var(--s2-spacing-50);
+}
+
+.compliance-file-remove:hover {
+  color: var(--s2-red-900);
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-start;
