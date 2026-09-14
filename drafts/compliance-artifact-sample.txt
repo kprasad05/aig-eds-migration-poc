@@ -1,0 +1,12 @@
+Compliance Artifact (Sample)
+=============================
+
+Workflow Name: web-content-update
+Workflow Title: Q3 Product Page Refresh
+Compliance System ID: CMP-12345
+Compliance System Name: Compliance Tracker
+Change Type: Non-Material Content Update
+
+This is a dummy compliance artifact file for testing the
+Compliance Artifacts upload field in the Request Publish
+modal. It has no real compliance content.
