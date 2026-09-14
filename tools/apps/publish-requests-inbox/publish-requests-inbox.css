@@ -354,6 +354,12 @@ sl-button.pw-quiet-secondary::part(base):hover:not(:disabled) {
   border-radius: var(--s2-corner-radius-100);
 }
 
+.artifact-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2-spacing-100);
+}
+
 .detail-comment {
   font-style: italic;
   background: var(--s2-gray-100);

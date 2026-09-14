@@ -1126,25 +1126,25 @@ class PublishRequestsApp extends LitElement {
               <dd>${value}</dd>
             </div>
           `)}
+          <div class="detail-row">
+            <dt>Compliance Artifacts</dt>
+            <dd>
+              ${this._complianceArtifacts.length > 0
+                ? html`<div class="artifact-links">
+                    ${this._complianceArtifacts.map((artifact) => {
+                      const name = decodeURIComponent(
+                        (artifact.artifact_path || '').split('/').pop() || artifact.artifact_path,
+                      );
+                      return html`<a href="${artifact.artifact_path}" target="_blank" rel="noopener" class="action-link">
+                        <svg class="action-icon" viewBox="0 0 18 18"><path d="M15.5 1h-13A1.5 1.5 0 0 0 1 2.5v13A1.5 1.5 0 0 0 2.5 17h13a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 15.5 1Zm.5 14.5a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-13a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 .5.5v13ZM13 4.5a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0-.354.854L9.793 6.5 5.146 11.146a.5.5 0 0 0 .708.708L10.5 7.207l1.646 1.647A.5.5 0 0 0 13 8.5v-4Z"/></svg>
+                        ${name}
+                      </a>`;
+                    })}
+                  </div>`
+                : 'None'}
+            </dd>
+          </div>
         </dl>
-        <p class="review-card-title cc-title">Compliance Artifacts</p>
-        ${this._complianceArtifacts.length > 0
-          ? html`
-            <ul class="approvers-list">
-              ${this._complianceArtifacts.map((artifact) => {
-                const name = decodeURIComponent(
-                  (artifact.artifact_path || '').split('/').pop() || artifact.artifact_path,
-                );
-                return html`<li>
-                  <a href="${artifact.artifact_path}" target="_blank" rel="noopener" class="action-link">
-                    <svg class="action-icon" viewBox="0 0 18 18"><path d="M15.5 1h-13A1.5 1.5 0 0 0 1 2.5v13A1.5 1.5 0 0 0 2.5 17h13a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 15.5 1Zm.5 14.5a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-13a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 .5.5v13ZM13 4.5a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0-.354.854L9.793 6.5 5.146 11.146a.5.5 0 0 0 .708.708L10.5 7.207l1.646 1.647A.5.5 0 0 0 13 8.5v-4Z"/></svg>
-                    ${name}
-                  </a>
-                </li>`;
-              })}
-            </ul>
-          `
-          : html`<p class="review-card-body">No compliance artifacts attached.</p>`}
       </section>
     `;
   }

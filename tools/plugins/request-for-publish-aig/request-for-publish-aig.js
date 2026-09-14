@@ -252,17 +252,9 @@ class RequestForPublishAigPlugin extends LitElement {
 
     const complianceArtifactNames = this._complianceFiles.map((file) => file.name);
 
-    const complianceDetails = [
-      workflowTitle && `Workflow Title: ${workflowTitle}`,
-      workflowName && `Workflow Name: ${workflowName}`,
-      complianceSystemId && `Compliance System ID: ${complianceSystemId}`,
-      complianceSystemName && `Compliance System Name: ${complianceSystemName}`,
-      changeType && `Change Type: ${changeType}`,
-      complianceArtifactNames.length > 0 && `Compliance Artifacts: ${complianceArtifactNames.join(', ')}`,
-    ].filter(Boolean).join('\n');
-
+    // Compliance details are stored in Supabase and shown in the reviewer's
+    // Compliance Details card, so they are intentionally omitted from the comment.
     const commentParts = [`API test link: ${apiUrl}`];
-    if (complianceDetails) commentParts.push(complianceDetails);
     if (comment) commentParts.push(comment);
     const fullComment = commentParts.join('\n\n');
 
