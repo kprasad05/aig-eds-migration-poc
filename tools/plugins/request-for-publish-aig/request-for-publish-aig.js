@@ -343,7 +343,7 @@ class RequestForPublishAigPlugin extends LitElement {
     const { org, repo: site } = this.context;
 
     const result = await withdrawPublishRequest(
-      org, site, this.contentPath, this._userEmail, this.token,
+      org, site, this.contentPath, this._userEmail, this.token, this.previewUrl,
     );
 
     this._isWithdrawing = false;

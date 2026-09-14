@@ -267,15 +267,51 @@ export async function resendPublishRequest(requestData, token) {
 }
 
 /**
+ * Mark any active workflow_requests rows for a preview URL as inactive
+ * (workflow_status = false). Best-effort; errors are logged, never thrown.
+ * @param {string} previewUrl - The preview URL used when the workflow was recorded.
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function deactivateWorkflowForPreviewUrl(previewUrl) {
+  if (!previewUrl) return { success: true };
+  try {
+    const params = new URLSearchParams({
+      preview_url: `eq.${previewUrl}`,
+      workflow_status: 'eq.true',
+    });
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?${params.toString()}`, {
+      method: 'PATCH',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({ workflow_status: false }),
+    });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      console.error('Supabase workflow deactivation failed:', resp.status, text);
+      return { success: false, error: `Supabase update failed (${resp.status})` };
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error deactivating workflow:', error);
+    return { success: false, error: error.message || 'Supabase update error' };
+  }
+}
+
+/**
  * Withdraw (cancel) the caller's own pending publish request.
  * @param {string} org - Organization
  * @param {string} site - Site
  * @param {string} path - Content path
  * @param {string} _requesterEmail - Unused; the worker derives identity from the token.
  * @param {string} token - Authorization token
+ * @param {string} previewUrl - Preview URL, used to deactivate the Supabase workflow row.
  * @returns {Promise<Object>} Result
  */
-export async function withdrawPublishRequest(org, site, path, _requesterEmail, token) {
+export async function withdrawPublishRequest(org, site, path, _requesterEmail, token, previewUrl) {
   try {
     const opts = getOpts(token, 'POST', { org, site, path });
     const response = await fetch(`${getWorkerUrl()}/api/requests/withdraw`, opts);
@@ -283,6 +319,8 @@ export async function withdrawPublishRequest(org, site, path, _requesterEmail, t
     if (!response.ok) {
       return { success: false, error: result.error || 'Failed to withdraw request' };
     }
+    // Best-effort: mark the recorded workflow inactive.
+    await deactivateWorkflowForPreviewUrl(previewUrl);
     return { success: true };
   } catch (error) {
     console.error('Error withdrawing publish request:', error);

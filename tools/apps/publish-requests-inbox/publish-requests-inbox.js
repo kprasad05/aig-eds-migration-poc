@@ -544,7 +544,9 @@ class PublishRequestsApp extends LitElement {
     this._message = null;
 
     // Reject server-side: removes the pending row + emails the author the reason.
-    const result = await rejectRequest(this._org, this._site, this._path, reason, this.token);
+    const result = await rejectRequest(
+      this._org, this._site, this._path, reason, this.token, this._previewUrl,
+    );
 
     this._isProcessing = false;
 
