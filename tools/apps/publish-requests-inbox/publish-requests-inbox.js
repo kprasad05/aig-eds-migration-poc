@@ -172,12 +172,6 @@ class PublishRequestsApp extends LitElement {
     return `https://${this._liveHost}${path}`;
   }
 
-  get adaScanUrl() {
-    // Dummy ADA scan link — page title passed as a query param
-    const page = this._path?.split('/').pop() || '';
-    return `https://ada-scan.example.com/scan?page=${encodeURIComponent(page)}`;
-  }
-
   get diffUrl() {
     // Use the Page Status diff tool with embed mode for clean iframe display
     return `https://tools.aem.live/tools/page-status/diff.html?org=${encodeURIComponent(this._org)}&site=${encodeURIComponent(this._site)}&path=${encodeURIComponent(this._path)}`;
@@ -1202,10 +1196,14 @@ class PublishRequestsApp extends LitElement {
         <section class="review-card">
           <h3 class="review-card-title">Accessibility Scan</h3>
           <p class="review-card-body">Review the ADA scan report for this page before publishing.</p>
-          <a href="${this.adaScanUrl}" target="_blank" rel="noopener" class="action-link">
-            <svg class="action-icon" viewBox="0 0 18 18"><path d="M9 1a8 8 0 1 0 8 8 8 8 0 0 0-8-8Zm0 15a7 7 0 1 1 7-7 7 7 0 0 1-7 7Z"/><path d="M9 4a1 1 0 0 0-1 1v4a1 1 0 0 0 .553.894l3 1.5a1 1 0 0 0 .894-1.788L10 8.382V5a1 1 0 0 0-1-1Z"/></svg>
-            View ADA Scan Report
-          </a>
+          ${this._workflowDetails?.ada_scan_report
+            ? html`
+              <a href="${this._workflowDetails.ada_scan_report}" target="_blank" rel="noopener" class="action-link">
+                <svg class="action-icon" viewBox="0 0 18 18"><path d="M9 1a8 8 0 1 0 8 8 8 8 0 0 0-8-8Zm0 15a7 7 0 1 1 7-7 7 7 0 0 1-7 7Z"/><path d="M9 4a1 1 0 0 0-1 1v4a1 1 0 0 0 .553.894l3 1.5a1 1 0 0 0 .894-1.788L10 8.382V5a1 1 0 0 0-1-1Z"/></svg>
+                View ADA Scan Report
+              </a>
+            `
+            : html`<p class="review-card-body">No ADA scan report available.</p>`}
         </section>
 
         <section class="review-card">

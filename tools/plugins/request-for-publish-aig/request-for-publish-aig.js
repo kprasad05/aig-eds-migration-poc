@@ -125,6 +125,13 @@ class RequestForPublishAigPlugin extends LitElement {
     return `https://main--${site}--${org}.aem.page${path}`;
   }
 
+  get adaScanUrl() {
+    // Dummy ADA scan link — page title passed as a query param.
+    // Mirrors the inbox's adaScanUrl so both sides generate the same URL.
+    const page = this.contentPath?.split('/').pop() || '';
+    return `https://ada-scan.example.com/scan?page=${encodeURIComponent(page)}`;
+  }
+
   get diffUrl() {
     // Use the Page Status diff tool with embed mode for clean iframe display
     // https://tools.aem.live/tools/page-status/diff.html?org={org}&site={site}&path={path}&embed=true
@@ -298,6 +305,9 @@ class RequestForPublishAigPlugin extends LitElement {
         compliance_system_id: complianceSystemId,
         compliance_system_name: complianceSystemName,
         change_type: changeType,
+        payload_path: this.context.path,
+        env: this.context.ref,
+        ada_scan_report: this.adaScanUrl,
       });
       // One compliance_artifacts row per uploaded file, linked by workflowid.
       await pushComplianceArtifacts(workflowid, complianceArtifactNames);
