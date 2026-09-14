@@ -60,6 +60,82 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Build workflow details JSON from Supabase
+        id: build_workflow_details
+        env:
+          # Supabase publishable key — safe to expose (RLS-guarded, read-only here).
+          SUPABASE_URL: https://hlsbfggivfgkqxzmqvgo.supabase.co
+          SUPABASE_KEY: sb_publishable_iU5SL93AmI2tCSCvW-SEeQ_bgAODIGB
+        run: |
+          PAGE_URL="${{ steps.build_url.outputs.page_url }}"
+
+          # Most recent workflow_requests row for this preview URL.
+          curl -s -G "$SUPABASE_URL/rest/v1/workflow_requests" \
+            --data-urlencode "preview_url=eq.$PAGE_URL" \
+            --data-urlencode "order=workflowid.desc" \
+            --data-urlencode "limit=1" \
+            --data-urlencode "select=*" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            -o workflow.json
+          echo "workflow_requests response:"
+          cat workflow.json
+
+          # Compliance artifacts sharing that workflowid (empty array if none/no row).
+          WORKFLOW_ID="$(jq -r '.[0].workflowid // empty' workflow.json)"
+          if [ -n "$WORKFLOW_ID" ]; then
+            curl -s -G "$SUPABASE_URL/rest/v1/compliance_artifacts" \
+              --data-urlencode "workflowid=eq.$WORKFLOW_ID" \
+              --data-urlencode "select=*" \
+              -H "apikey: $SUPABASE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_KEY" \
+              -o artifacts.json
+          else
+            echo '[]' > artifacts.json
+          fi
+          echo "compliance_artifacts response:"
+          cat artifacts.json
+
+          # Build the AIG-style workflow details JSON. Fields with no DB source
+          # (payload-path, env, ada-scan-report) are emitted as empty strings.
+          jq -n \
+            --slurpfile wf workflow.json \
+            --slurpfile art artifacts.json \
+            --arg payloadPath "" \
+            --arg env "" \
+            --arg adaScan "" \
+            '
+            ($wf[0][0] // {}) as $w
+            | ($art[0] // []) as $arts
+            | {
+                "payload-path": $payloadPath,
+                "workflow-name": ($w."workflow_name" // ""),
+                "workflow-tasks-details": {
+                  "metadata": {
+                    "compliance-system-id": ($w."compliance_system_id" // ""),
+                    "change-type": ($w."change_type" // ""),
+                    "ada-scan-report": $adaScan,
+                    "compliance-system-name": ($w."compliance_system_name" // "")
+                  },
+                  "compliance-artifacts": ($arts | map(.artifact_path)),
+                  "workflow-status": (if $w."workflow_status" then "Active" else "Inactive" end)
+                },
+                "page-title": ($w."page_title" // ""),
+                "workflow-title": ($w."workflow_title" // ""),
+                "env": $env,
+                "preview-url": ($w."preview_url" // ""),
+                "workflowid": (if $w."workflowid" == null then "" else ($w."workflowid" | tostring) end)
+              }
+            ' > workflow-details.json
+
+          echo "Workflow details JSON:"
+          cat workflow-details.json
+
+          echo "### Workflow Details Output" >> "$GITHUB_STEP_SUMMARY"
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"
+          cat workflow-details.json >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
       - name: Call test API with output JSON
         id: call_api
         run: |
