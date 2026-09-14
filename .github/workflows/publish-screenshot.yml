@@ -63,12 +63,12 @@ jobs:
       - name: Call test API with output JSON
         id: call_api
         run: |
-          PAGE_TITLE=$(jq -r '.["page-title"]' output.json)
-          PREVIEW_URL=$(jq -r '.["preview-url"]' output.json)
+          API_URL="https://httpbin.org/post"
 
-          API_URL="https://httpbin.org/get?page-title=$(jq -rn --arg v "$PAGE_TITLE" '$v|@uri')&preview-url=$(jq -rn --arg v "$PREVIEW_URL" '$v|@uri')"
-
-          curl -s "$API_URL" -o api_response.json
+          curl -s -X POST "$API_URL" \
+            -H "Content-Type: application/json" \
+            --data @output.json \
+            -o api_response.json
 
           echo "API responded with:"
           cat api_response.json
