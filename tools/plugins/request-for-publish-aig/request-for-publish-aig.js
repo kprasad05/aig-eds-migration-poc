@@ -25,6 +25,9 @@ import {
   withdrawPublishRequest,
   getUserEmail,
   checkExistingRequest,
+  getPreviewPageTitle,
+  pushWorkflowToSupabase,
+  pushComplianceArtifacts,
 } from './utils.js';
 
 // Super Lite (sl-*) — Spectrum-aligned controls for DA; pairs with S2 tokens in CSS.
@@ -288,6 +291,24 @@ class RequestForPublishAigPlugin extends LitElement {
     if (result.success) {
       this._submitted = true;
       this._message = { type: 'success', text: 'Publish request sent! Approvers have been notified.' };
+
+      // Best-effort: record the submitted request in Supabase. Never blocks or
+      // fails the user flow — errors are logged inside the helpers.
+      const workflowid = Date.now();
+      const pageTitle = await getPreviewPageTitle(this.previewUrl);
+      await pushWorkflowToSupabase({
+        workflowid,
+        workflow_name: workflowName,
+        workflow_title: workflowTitle,
+        page_title: pageTitle,
+        preview_url: this.previewUrl,
+        workflow_status: true,
+        compliance_system_id: complianceSystemId,
+        compliance_system_name: complianceSystemName,
+        change_type: changeType,
+      });
+      // One compliance_artifacts row per uploaded file, linked by workflowid.
+      await pushComplianceArtifacts(workflowid, complianceArtifactNames);
     } else {
       this._message = { type: 'error', text: result.message };
     }

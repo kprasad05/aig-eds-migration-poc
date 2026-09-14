@@ -21,6 +21,18 @@ const LOCAL_WORKER_URL = 'http://localhost:8787';
 
 const CORS_PROXY = 'https://da-etc.adobeaem.workers.dev/cors';
 
+// Supabase project used to record submitted publish requests. The publishable
+// key is safe to ship client-side: the table is protected by an insert-only RLS
+// policy so the key can only append rows, never read/update/delete.
+const SUPABASE_URL = 'https://hlsbfggivfgkqxzmqvgo.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_iU5SL93AmI2tCSCvW-SEeQ_bgAODIGB';
+const SUPABASE_TABLE = 'workflow_requests';
+const SUPABASE_ARTIFACTS_TABLE = 'compliance_artifacts';
+
+// Base da.live media location where uploaded compliance artifacts live. The
+// artifact filename is appended to build each row's artifact_path.
+const ARTIFACT_BASE_URL = 'https://da.live/media#/kprasad05/aig-eds-migration-poc/drafts/dorothy/docs/';
+
 // daFetch ensures a fresh IMS token is used on every request (handles expiry).
 const { daFetch } = await import('https://da.live/nx/utils/daFetch.js');
 
@@ -317,4 +329,89 @@ export async function getUserEmail(token) {
     console.warn('Could not fetch user profile');
     return '';
   }
+}
+
+/**
+ * Fetch the given preview URL and parse its document <title>. Best-effort: if the
+ * request or parse fails, falls back to the last path segment of the URL.
+ * @param {string} previewUrl - The AEM .aem.page preview URL
+ * @returns {Promise<string>} The page title, or a derived fallback.
+ */
+export async function getPreviewPageTitle(previewUrl) {
+  const fallback = () => {
+    try {
+      const segment = new URL(previewUrl).pathname.split('/').filter(Boolean).pop();
+      return segment || '';
+    } catch {
+      return '';
+    }
+  };
+  try {
+    const resp = await fetch(previewUrl);
+    if (!resp.ok) return fallback();
+    const html = await resp.text();
+    const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    return match ? match[1].trim() : fallback();
+  } catch (error) {
+    console.warn('Could not fetch preview page title:', error);
+    return fallback();
+  }
+}
+
+/**
+ * Insert one row (object) or many rows (array) into a Supabase table via REST.
+ * Best-effort: errors are logged, never thrown.
+ * @param {string} table - The Supabase table name.
+ * @param {Object|Object[]} payload - Row or rows to insert.
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+async function insertRows(table, payload) {
+  try {
+    const resp = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '');
+      console.error(`Supabase insert into ${table} failed:`, resp.status, text);
+      return { success: false, error: `Supabase insert failed (${resp.status})` };
+    }
+    return { success: true };
+  } catch (error) {
+    console.error(`Error writing to Supabase table ${table}:`, error);
+    return { success: false, error: error.message || 'Supabase write error' };
+  }
+}
+
+/**
+ * Record a submitted publish request in Supabase. Best-effort analytics write:
+ * runs only after a successful publish request and never blocks the user flow —
+ * failures are logged, not surfaced.
+ * @param {Object} row - The workflow_requests row to insert.
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function pushWorkflowToSupabase(row) {
+  return insertRows(SUPABASE_TABLE, row);
+}
+
+/**
+ * Record one compliance_artifacts row per uploaded artifact filename, all sharing
+ * the given workflowid. Best-effort; a no-op when there are no artifacts.
+ * @param {number} workflowid - The parent workflow_requests id.
+ * @param {string[]} artifactNames - Uploaded compliance file names.
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function pushComplianceArtifacts(workflowid, artifactNames) {
+  if (!artifactNames || artifactNames.length === 0) return { success: true };
+  const rows = artifactNames.map((name) => ({
+    workflowid,
+    artifact_path: `${ARTIFACT_BASE_URL}${name}`,
+  }));
+  return insertRows(SUPABASE_ARTIFACTS_TABLE, rows);
 }
