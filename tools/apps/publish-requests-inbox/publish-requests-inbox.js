@@ -34,6 +34,7 @@ import {
   getLiveHostFromConfig,
   fetchAccentSettings,
   getWorkflowDetailsForPreviewUrl,
+  deactivateWorkflowForPreviewUrl,
 } from './api.js';
 
 // Super Lite (sl-*) — Spectrum-aligned controls for DA; pairs with S2 tokens in CSS.
@@ -179,6 +180,12 @@ class PublishRequestsApp extends LitElement {
 
   getDiffUrlForPath(path) {
     return `https://tools.aem.live/tools/page-status/diff.html?org=${encodeURIComponent(this._org)}&site=${encodeURIComponent(this._site)}&path=${encodeURIComponent(path)}`;
+  }
+
+  previewUrlForPath(path) {
+    // Mirrors the preview URL stored at submission time (with /index stripped).
+    const cleanPath = path?.replace(/\/index$/, '') || '';
+    return `https://main--${this._site}--${this._org}.aem.page${cleanPath}`;
   }
 
   getReviewUrl(request) {
@@ -511,6 +518,8 @@ class PublishRequestsApp extends LitElement {
         if (!bookkeep.success) {
           this._message = { type: 'info', text: `Published, but recording the approval failed: ${bookkeep.error}` };
         }
+        // Best-effort: mark the recorded workflow inactive.
+        await deactivateWorkflowForPreviewUrl(this._previewUrl);
       } else {
         this._message = { type: 'error', text: result.error };
       }
@@ -567,6 +576,8 @@ class PublishRequestsApp extends LitElement {
       this._message = bookkeep.success
         ? { type: 'success', text: `Published: ${request.path}` }
         : { type: 'info', text: `Published: ${request.path}. Recording approval failed: ${bookkeep.error}` };
+      // Best-effort: mark the recorded workflow inactive.
+      await deactivateWorkflowForPreviewUrl(this.previewUrlForPath(request.path));
     } else {
       this._message = { type: 'error', text: `Failed to publish ${request.path}: ${result.error}` };
     }
@@ -635,6 +646,11 @@ class PublishRequestsApp extends LitElement {
         const succeededSet = new Set(succeededPaths);
         this._pendingRequests = this._pendingRequests.filter((r) => !succeededSet.has(r.path));
 
+        // Best-effort: mark the recorded workflows inactive for succeeded paths.
+        await Promise.all(succeededPaths.map(
+          (p) => deactivateWorkflowForPreviewUrl(this.previewUrlForPath(p)),
+        ));
+
         this._approveAllProcessing = false;
         this._message = {
           type: 'error',
@@ -647,6 +663,11 @@ class PublishRequestsApp extends LitElement {
     // All succeeded — record approval for all paths (sheet removal + author email).
     const bookkeep = await approveRequests(this._org, this._site, allPaths, this.token);
     const bulkNotifyError = bookkeep.success ? null : bookkeep.error;
+
+    // Best-effort: mark the recorded workflows inactive.
+    await Promise.all(allPaths.map(
+      (p) => deactivateWorkflowForPreviewUrl(this.previewUrlForPath(p)),
+    ));
 
     this._pendingRequests = [];
     this._approveAllProcessing = false;
