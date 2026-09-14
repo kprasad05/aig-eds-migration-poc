@@ -21,6 +21,11 @@ const LOCAL_WORKER_URL = 'http://localhost:8787';
 
 const CORS_PROXY = 'https://da-etc.adobeaem.workers.dev/cors';
 
+// Supabase project that stores submitted publish-request workflow metadata and
+// their compliance artifacts. The publishable key is safe to ship client-side.
+const SUPABASE_URL = 'https://hlsbfggivfgkqxzmqvgo.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_iU5SL93AmI2tCSCvW-SEeQ_bgAODIGB';
+
 // daFetch ensures a fresh IMS token is used on every request (handles token expiry)
 const { daFetch } = await import('https://da.live/nx/utils/daFetch.js');
 
@@ -393,6 +398,72 @@ export async function resendPublishRequest(org, site, path, requesterEmail, toke
   } catch (error) {
     console.error('Error resending publish request:', error);
     return { success: false, error: error.message || 'An error occurred' };
+  }
+}
+
+// ===========================================================================
+// Supabase — read submitted workflow metadata + compliance artifacts.
+// ===========================================================================
+
+/** Shared headers for Supabase REST reads with the publishable key. */
+function supabaseHeaders() {
+  return {
+    apikey: SUPABASE_KEY,
+    Authorization: `Bearer ${SUPABASE_KEY}`,
+  };
+}
+
+/**
+ * Fetch the compliance_artifacts rows linked to a workflowid.
+ * @param {number|string} workflowid - The parent workflow id.
+ * @returns {Promise<Array<{workflowid: number, artifact_path: string}>>}
+ */
+async function getComplianceArtifacts(workflowid) {
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/compliance_artifacts?workflowid=eq.${encodeURIComponent(workflowid)}&select=*`;
+    const resp = await fetch(url, { headers: supabaseHeaders() });
+    if (!resp.ok) {
+      console.error('Supabase artifacts fetch failed:', resp.status);
+      return [];
+    }
+    return await resp.json();
+  } catch (error) {
+    console.error('Error fetching compliance artifacts:', error);
+    return [];
+  }
+}
+
+/**
+ * Fetch the most recent active (workflow_status = true) workflow record for a
+ * preview URL, along with its compliance artifacts. Best-effort; returns null
+ * when nothing matches or the read fails.
+ * @param {string} previewUrl - The AEM .aem.page preview URL.
+ * @returns {Promise<{workflow: Object, artifacts: Array}|null>}
+ */
+export async function getWorkflowDetailsForPreviewUrl(previewUrl) {
+  if (!previewUrl) return null;
+  try {
+    const params = new URLSearchParams({
+      preview_url: `eq.${previewUrl}`,
+      workflow_status: 'eq.true',
+      order: 'workflowid.desc',
+      limit: '1',
+      select: '*',
+    });
+    const url = `${SUPABASE_URL}/rest/v1/workflow_requests?${params.toString()}`;
+    const resp = await fetch(url, { headers: supabaseHeaders() });
+    if (!resp.ok) {
+      console.error('Supabase workflow fetch failed:', resp.status);
+      return null;
+    }
+    const rows = await resp.json();
+    const workflow = rows[0];
+    if (!workflow) return null;
+    const artifacts = await getComplianceArtifacts(workflow.workflowid);
+    return { workflow, artifacts };
+  } catch (error) {
+    console.error('Error fetching workflow details:', error);
+    return null;
   }
 }
 

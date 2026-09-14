@@ -33,6 +33,7 @@ import {
   fetchSiteConfig,
   getLiveHostFromConfig,
   fetchAccentSettings,
+  getWorkflowDetailsForPreviewUrl,
 } from './api.js';
 
 // Super Lite (sl-*) — Spectrum-aligned controls for DA; pairs with S2 tokens in CSS.
@@ -119,6 +120,9 @@ class PublishRequestsApp extends LitElement {
     _orgSiteValue: { state: true },
     // Inline reject error
     _rejectError: { state: true },
+    // Compliance workflow metadata fetched from Supabase for the reviewed page
+    _workflowDetails: { state: true },
+    _complianceArtifacts: { state: true },
   };
 
   constructor() {
@@ -141,6 +145,8 @@ class PublishRequestsApp extends LitElement {
     this._requester = false;
     this._myRequestActions = new Map();
     this._orgSiteValue = '';
+    this._workflowDetails = null;
+    this._complianceArtifacts = [];
   }
 
   connectedCallback() {
@@ -367,6 +373,16 @@ class PublishRequestsApp extends LitElement {
       }
     }
 
+    // Fetch compliance workflow metadata (and artifacts) for this preview URL.
+    // Best-effort: a missing/failed lookup just hides the compliance card.
+    this._workflowDetails = null;
+    this._complianceArtifacts = [];
+    const details = await getWorkflowDetailsForPreviewUrl(this._previewUrl);
+    if (details) {
+      this._workflowDetails = details.workflow;
+      this._complianceArtifacts = details.artifacts || [];
+    }
+
     this._state = 'review';
   }
 
@@ -456,6 +472,8 @@ class PublishRequestsApp extends LitElement {
     this._message = null;
     this._rejectError = null;
     this._isProcessing = false;
+    this._workflowDetails = null;
+    this._complianceArtifacts = [];
 
     // Remove the just-processed request from the cached list
     if (reviewedPath && (this._state === 'approved' || this._state === 'rejected')) {
@@ -1083,6 +1101,54 @@ class PublishRequestsApp extends LitElement {
     `;
   }
 
+  // ======== Compliance details (from Supabase) ========
+
+  renderComplianceCard() {
+    const wf = this._workflowDetails;
+    if (!wf) return nothing;
+
+    const rows = [
+      ['Workflow Title', wf.workflow_title],
+      ['Workflow Name', wf.workflow_name],
+      ['Page Title', wf.page_title],
+      ['Compliance System ID', wf.compliance_system_id],
+      ['Compliance System Name', wf.compliance_system_name],
+      ['Change Type', wf.change_type],
+    ].filter(([, value]) => value);
+
+    return html`
+      <section class="review-card">
+        <h3 class="review-card-title">Compliance Details</h3>
+        <dl class="detail-list">
+          ${rows.map(([label, value]) => html`
+            <div class="detail-row">
+              <dt>${label}</dt>
+              <dd>${value}</dd>
+            </div>
+          `)}
+        </dl>
+        <p class="review-card-title cc-title">Compliance Artifacts</p>
+        ${this._complianceArtifacts.length > 0
+          ? html`
+            <ul class="approvers-list">
+              ${this._complianceArtifacts.map((artifact) => {
+                const name = decodeURIComponent(
+                  (artifact.artifact_path || '').split('/').pop() || artifact.artifact_path,
+                );
+                return html`<li>
+                  <a href="${artifact.artifact_path}" target="_blank" rel="noopener" class="action-link">
+                    <svg class="action-icon" viewBox="0 0 18 18"><path d="M15.5 1h-13A1.5 1.5 0 0 0 1 2.5v13A1.5 1.5 0 0 0 2.5 17h13a1.5 1.5 0 0 0 1.5-1.5v-13A1.5 1.5 0 0 0 15.5 1Zm.5 14.5a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-13a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 .5.5v13ZM13 4.5a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0-.354.854L9.793 6.5 5.146 11.146a.5.5 0 0 0 .708.708L10.5 7.207l1.646 1.647A.5.5 0 0 0 13 8.5v-4Z"/></svg>
+                    ${name}
+                  </a>
+                </li>`;
+              })}
+            </ul>
+          `
+          : html`<p class="review-card-body">No compliance artifacts attached.</p>`}
+      </section>
+    `;
+  }
+
   // ======== Single-request review render ========
 
   renderReview() {
@@ -1128,6 +1194,8 @@ class PublishRequestsApp extends LitElement {
             ` : nothing}
           </dl>
         </section>
+
+        ${this.renderComplianceCard()}
 
         <section class="review-card">
           <h3 class="review-card-title">Accessibility Scan</h3>
