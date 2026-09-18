@@ -46,4 +46,13 @@
       <video:thumbnail_loc>https://main--aig-eds-migration-poc--kprasad05.aem.live/default-meta-image.png?width=1200&amp;format=pjpg&amp;optimize=medium</video:thumbnail_loc>
     </video:video>
   </url>
+  <url>
+    <loc>https://main--aig-eds-migration-poc--kprasad05.aem.live/drafts/purush/videodemo</loc>
+    <video:video>
+      <video:title>testing video feature - heading - demo</video:title>
+      <video:description>testing video feature - heading - demo</video:description>
+      <video:content_loc>https://www.media.aig.com/is/content/aigmedia/aig/america-canada/us/videos/high-res/tradenable_how_to_submit_a_claim.mp4</video:content_loc>
+      <video:thumbnail_loc>https://main--aig-eds-migration-poc--kprasad05.aem.live/default-meta-image.png?width=1200&amp;format=pjpg&amp;optimize=medium</video:thumbnail_loc>
+    </video:video>
+  </url>
 </urlset>
