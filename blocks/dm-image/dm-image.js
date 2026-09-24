@@ -4,12 +4,24 @@
  * toolbar action) as a responsive, optimized <picture>.
  */
 
-// Matches AEM as a Cloud Service author/delivery hosts, e.g.
-// author-p56807-e1482157.adobeaemcloud.com or delivery-p56807-e1482157.adobeaemcloud.com
-const DM_HOST_PATTERN = /^(author|delivery)-p\d+-e\d+\.adobeaemcloud\.com$/i;
+// Matches public AEM as a Cloud Service Dynamic Media delivery hosts.
+const DM_HOST_PATTERN = /^delivery-p\d+-e\d+\.adobeaemcloud\.com$/i;
 
 const DEFAULT_WIDTHS = [320, 480, 768, 1024, 1600, 2000];
 const DEFAULT_SIZES = '100vw';
+const SUPPORTED_FALLBACK_FORMATS = new Set(['avif', 'gif', 'jpeg', 'jpg', 'png', 'webp']);
+
+function getFallbackFormat(assetUrl) {
+  try {
+    const extension = new URL(assetUrl, window.location.href).pathname
+      .split('.')
+      .pop()
+      .toLowerCase();
+    return SUPPORTED_FALLBACK_FORMATS.has(extension) ? extension : 'jpg';
+  } catch {
+    return 'jpg';
+  }
+}
 
 /**
  * Checks whether a URL points at an AEM/Dynamic Media asset delivery host.
@@ -46,9 +58,21 @@ function filenameFromUrl(url) {
  * @param {string} assetUrl base asset delivery URL
  * @param {number[]} widths widths (in px) to request renditions for
  * @param {{format?: string, quality?: string}} [options] rendition options
- * @returns {{srcset: string, src: string}} srcset string and a default fallback src
+ * @returns {{srcset: string, src: string, fallbackSrcset: string, fallbackSrc: string}}
+ * srcset strings and default fallback sources
  */
-export function buildDmSrcset(assetUrl, widths, { format = 'webply', quality = 'medium' } = {}) {
+export function buildDmSrcset(assetUrl, widths, {
+  format = 'webply',
+  fallbackFormat = getFallbackFormat(assetUrl),
+  quality = 'medium',
+} = {}) {
+  const validWidths = [...new Set(widths)]
+    .filter((width) => Number.isInteger(width) && width > 0)
+    .sort((a, b) => a - b);
+  if (!validWidths.length) {
+    throw new Error('At least one positive image width is required');
+  }
+
   const base = new URL(assetUrl, window.location.href);
   const variantUrl = (width) => {
     const variant = new URL(base);
@@ -57,9 +81,24 @@ export function buildDmSrcset(assetUrl, widths, { format = 'webply', quality = '
     variant.searchParams.set('optimize', quality);
     return variant.toString();
   };
-  const srcset = widths.map((width) => `${variantUrl(width)} ${width}w`).join(', ');
-  const defaultWidth = widths[Math.floor(widths.length / 2)];
-  return { srcset, src: variantUrl(defaultWidth) };
+  const fallbackVariantUrl = (width) => {
+    const variant = new URL(base);
+    variant.searchParams.set('width', width);
+    variant.searchParams.set('format', fallbackFormat);
+    variant.searchParams.set('optimize', quality);
+    return variant.toString();
+  };
+  const srcset = validWidths.map((width) => `${variantUrl(width)} ${width}w`).join(', ');
+  const fallbackSrcset = validWidths
+    .map((width) => `${fallbackVariantUrl(width)} ${width}w`)
+    .join(', ');
+  const defaultWidth = validWidths[Math.floor(validWidths.length / 2)];
+  return {
+    srcset,
+    src: variantUrl(defaultWidth),
+    fallbackSrcset,
+    fallbackSrc: fallbackVariantUrl(defaultWidth),
+  };
 }
 
 /**
@@ -92,8 +131,12 @@ export default function decorate(block) {
   let mediaRow = null;
   if (img) {
     assetUrl = img.currentSrc || img.src;
-    alt = img.alt || '';
-    mediaRow = findRow(img, block);
+    if (isDmAssetHref(assetUrl)) {
+      alt = img.alt || '';
+      mediaRow = findRow(img, block);
+    } else {
+      assetUrl = '';
+    }
   } else if (anchor && isDmAssetHref(anchor.href)) {
     assetUrl = anchor.href;
     const linkText = anchor.textContent.trim();
@@ -114,16 +157,23 @@ export default function decorate(block) {
   const captionText = (lastRow && lastRow !== mediaRow) ? lastRow.textContent.trim() : '';
   if (!alt) alt = captionText || filenameFromUrl(assetUrl);
 
-  const { srcset, src } = buildDmSrcset(assetUrl, DEFAULT_WIDTHS);
+  const {
+    srcset,
+    fallbackSrcset,
+    fallbackSrc,
+  } = buildDmSrcset(assetUrl, DEFAULT_WIDTHS);
 
   const picture = document.createElement('picture');
   const source = document.createElement('source');
+  source.type = 'image/webp';
   source.setAttribute('srcset', srcset);
   source.setAttribute('sizes', DEFAULT_SIZES);
   picture.append(source);
 
   const fallbackImg = document.createElement('img');
-  fallbackImg.src = src;
+  fallbackImg.src = fallbackSrc;
+  fallbackImg.setAttribute('srcset', fallbackSrcset);
+  fallbackImg.setAttribute('sizes', DEFAULT_SIZES);
   fallbackImg.alt = alt;
   fallbackImg.loading = 'lazy';
   picture.append(fallbackImg);

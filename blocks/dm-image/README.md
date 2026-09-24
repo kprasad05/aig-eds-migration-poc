@@ -13,11 +13,17 @@ toolbar action) and rendering it on the live page as an optimized, responsive
   - a plain `<img>` already pointing at a resolved rendition, or
   - a plain `<a>` whose href is the raw Dynamic Media / AEM Assets delivery
     URL (when `aem.assets.image.type=link` is configured).
-- At render time the block requests several width-specific renditions from
-  the asset delivery host via query params and assembles a `srcset`/`sizes`
-  responsive image, so the browser only downloads the size it needs.
+- At render time the block requests several width-specific WebP renditions
+  from the public asset delivery host via query params and assembles a
+  `srcset`/`sizes` responsive image, with an original-format fallback.
 - An optional second row lets an author add a caption (also used as the
   alt-text fallback when the picker doesn't carry one).
+
+This block cannot publish or activate an asset. The selected asset must already
+be approved/published and available from the AEM Assets delivery tier. Until
+that Dynamic Media configuration is complete, a delivery URL such as
+`https://delivery-p56807-e1482157.adobeaemcloud.com/...` may correctly return
+404 even though the block markup and URL transformation are working.
 
 ## DA.live prerequisite configuration
 
@@ -29,7 +35,7 @@ Assets integration is configured for the site in DA.live's `da.live/config`
 | Key | Value for this POC | Purpose |
 | --- | --- | --- |
 | `aem.repositoryId` | `author-p56807-e1482157.adobeaemcloud.com` | Points DA.live's picker at our AEMaaCS Author instance. |
-| `aem.asset.dm.delivery` | delivery host / DM delivery config for the same program+environment | Tells DA.live (and, indirectly, this block) which host serves optimized renditions. |
+| `aem.asset.dm.delivery` | delivery host / DM delivery config for the same program+environment | Tells DA.live (and, indirectly, this block) which host serves optimized renditions. The asset must also be approved/published to that delivery tier. |
 | `aem.asset.smartcrop.select` | smartcrop name(s) enabled on the asset, if any | Lets authors pick a smartcrop-based crop instead of the default rendition. |
 | `aem.assets.image.type` | `link` | Makes DA.live insert a plain `<a href="...">` to the asset delivery URL instead of an `<img>`, which is the path this block's link-detection branch demos. Leave unset (or `img`) to test the `<img>`-based branch instead. |
 
@@ -58,9 +64,13 @@ whether or not such a plugin is ever added later.
    **Insert AEM Asset** icon in the rich text toolbar to pick the Dynamic
    Media asset. DA.live inserts either the resolved `<img>` or the asset
    link, depending on `aem.assets.image.type`.
-4. Optional third row, single cell: type a caption. If present, it's
+4. Optional third row, single cell: type a caption. If present, it is
    rendered under the image and used as the `alt` text fallback when the
-   picker didn't set one.
+   picker did not set one.
+
+Only public `delivery-p###-e###.adobeaemcloud.com` asset URLs are transformed.
+Author URLs and ordinary non-Dynamic-Media images are left authored and are
+reported in the browser console instead of being published as image sources.
 
 ### Sample authored table
 
@@ -116,10 +126,13 @@ Both shapes decorate to the same responsive `<picture>` + caption markup.
 4. Confirm in devtools:
    - The block renders a `<picture>` with one `<source srcset>` listing
      multiple width-tagged URLs, plus a fallback `<img>`.
-   - Each URL in the `srcset` carries `width`, `format=webply`, and
+   - The `<source>` URLs carry `width`, `format=webply`, and
      `optimize=medium` query params pointing at the same asset path.
+   - The fallback `<img>` uses the original asset format and also has a
+     width-aware `srcset`.
    - If no asset was authored (empty block), the console logs a
      `[dm-image]` warning and nothing else breaks on the page.
-5. Once DA.live's AEM Assets integration is configured (see prerequisites
-   above), repeat the test against a real authored DA.live page and use the
-   asset picker instead of hand-typed markup.
+5. Once DA.live's AEM Assets integration and the AEM Assets delivery tier are
+   configured (see prerequisites above), verify that the selected asset URL
+   returns HTTP 200 before testing the block on a real authored page. Then use
+   the asset picker instead of hand-typed markup.
