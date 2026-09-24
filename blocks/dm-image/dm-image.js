@@ -63,27 +63,44 @@ export function buildDmSrcset(assetUrl, widths, { format = 'webply', quality = '
 }
 
 /**
+ * Finds the row (direct child of the block) that contains a given element.
+ * @param {Element} el descendant element
+ * @param {Element} block the block element
+ * @returns {Element|null} the row, or null if el is falsy
+ */
+function findRow(el, block) {
+  let node = el;
+  while (node && node.parentElement !== block) {
+    node = node.parentElement;
+  }
+  return node;
+}
+
+/**
  * loads and decorates the block
  * @param {Element} block The block element
  */
 export default function decorate(block) {
-  const [imageRow, captionRow] = [...block.children];
-  const scope = imageRow || block;
-
-  const img = scope.querySelector('img');
-  const anchor = scope.querySelector('a');
+  // Search the whole block rather than assuming a fixed row position: some
+  // authoring paths (e.g. inserting via the block library) carry an extra
+  // leading text row ahead of the actual image/link row.
+  const img = block.querySelector('img');
+  const anchor = block.querySelector('a');
 
   let assetUrl = '';
   let alt = '';
+  let mediaRow = null;
   if (img) {
     assetUrl = img.currentSrc || img.src;
     alt = img.alt || '';
+    mediaRow = findRow(img, block);
   } else if (anchor && isDmAssetHref(anchor.href)) {
     assetUrl = anchor.href;
     const linkText = anchor.textContent.trim();
     // DA.live's link-mode picker uses the raw filename as link text; humanize
     // it the same way a missing alt/caption falls back to the filename.
     alt = /\.[a-z0-9]{2,4}$/i.test(linkText) ? filenameFromUrl(linkText) : linkText;
+    mediaRow = findRow(anchor, block);
   }
 
   if (!assetUrl) {
@@ -92,7 +109,9 @@ export default function decorate(block) {
     return;
   }
 
-  const captionText = captionRow ? captionRow.textContent.trim() : '';
+  const rows = [...block.children];
+  const lastRow = rows[rows.length - 1];
+  const captionText = (lastRow && lastRow !== mediaRow) ? lastRow.textContent.trim() : '';
   if (!alt) alt = captionText || filenameFromUrl(assetUrl);
 
   const { srcset, src } = buildDmSrcset(assetUrl, DEFAULT_WIDTHS);
