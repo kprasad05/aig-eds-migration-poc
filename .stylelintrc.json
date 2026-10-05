@@ -1,3 +1,9 @@
 {
-  "extends": ["stylelint-config-standard"]
+  "extends": ["stylelint-config-standard"],
+  "overrides": [
+    {
+      "files": ["scripts/form-editor-support.css"],
+      "rules": { "no-descending-specificity": null }
+    }
+  ]
 }

@@ -25,6 +25,22 @@ npm i
 npm run lint
 ```
 
+## Forms POC
+
+See [Forms integration and authoring](docs/forms/README.md) for the official Adaptive
+Forms integration, DA sheet setup, submission destinations, and migration of the
+existing CAPTCHA demo. Adobe's Adaptive Form Block requires an AEM Forms Edge
+Delivery Services license.
+
+```sh
+npm run build:json
+npm run build:forms-fixture
+aem up --no-open --html-folder drafts --stop-other=false \
+  --url https://main--aig-eds-migration-poc--kprasad05.aem.page
+# In a separate terminal, with the server running:
+npm run test:forms
+```
+
 ## Local development
 
 1. Create a new repository based on the `aem-boilerplate` template

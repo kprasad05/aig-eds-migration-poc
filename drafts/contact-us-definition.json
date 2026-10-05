@@ -1,0 +1,116 @@
+{
+  "total": 8,
+  "offset": 0,
+  "limit": 8,
+  "columns": [
+    "Name",
+    "Type",
+    "Label",
+    "Mandatory",
+    "Placeholder",
+    "Value",
+    "Action",
+    "Required Error Message",
+    "Pattern Error Message",
+    "Max"
+  ],
+  "data": [
+    {
+      "Name": "firstName",
+      "Type": "text",
+      "Label": "First Name",
+      "Mandatory": "true",
+      "Placeholder": "First name",
+      "Value": "",
+      "Action": "",
+      "Required Error Message": "Please enter your first name.",
+      "Pattern Error Message": "",
+      "Max": "100"
+    },
+    {
+      "Name": "lastName",
+      "Type": "text",
+      "Label": "Last Name",
+      "Mandatory": "true",
+      "Placeholder": "Last name",
+      "Value": "",
+      "Action": "",
+      "Required Error Message": "Please enter your last name.",
+      "Pattern Error Message": "",
+      "Max": "100"
+    },
+    {
+      "Name": "email",
+      "Type": "email",
+      "Label": "Email",
+      "Mandatory": "true",
+      "Placeholder": "you@example.com",
+      "Value": "",
+      "Action": "",
+      "Required Error Message": "Please enter your email address.",
+      "Pattern Error Message": "Please enter a valid email address.",
+      "Max": "254"
+    },
+    {
+      "Name": "phone",
+      "Type": "tel",
+      "Label": "Phone Number",
+      "Mandatory": "",
+      "Placeholder": "Phone number",
+      "Value": "",
+      "Action": "",
+      "Required Error Message": "",
+      "Pattern Error Message": "",
+      "Max": "50"
+    },
+    {
+      "Name": "company",
+      "Type": "text",
+      "Label": "Company",
+      "Mandatory": "",
+      "Placeholder": "Company",
+      "Value": "",
+      "Action": "",
+      "Required Error Message": "",
+      "Pattern Error Message": "",
+      "Max": "200"
+    },
+    {
+      "Name": "subject",
+      "Type": "text",
+      "Label": "Subject",
+      "Mandatory": "",
+      "Placeholder": "Subject",
+      "Value": "",
+      "Action": "",
+      "Required Error Message": "",
+      "Pattern Error Message": "",
+      "Max": "200"
+    },
+    {
+      "Name": "message",
+      "Type": "textarea",
+      "Label": "Message",
+      "Mandatory": "true",
+      "Placeholder": "How can we help?",
+      "Value": "",
+      "Action": "",
+      "Required Error Message": "Please enter a message.",
+      "Pattern Error Message": "",
+      "Max": "5000"
+    },
+    {
+      "Name": "submit",
+      "Type": "submit",
+      "Label": "Submit",
+      "Mandatory": "",
+      "Placeholder": "",
+      "Value": "Thank you. Your message has been sent.",
+      "Action": "REPLACE_WITH_DESTINATION_SPREADSHEET_URL",
+      "Required Error Message": "",
+      "Pattern Error Message": "",
+      "Max": ""
+    }
+  ],
+  ":type": "sheet"
+}

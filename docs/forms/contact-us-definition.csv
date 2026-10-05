@@ -1,0 +1,9 @@
+Name,Type,Label,Mandatory,Placeholder,Value,Action,Required Error Message,Pattern Error Message,Max
+firstName,text,First Name,true,First name,,,Please enter your first name.,,100
+lastName,text,Last Name,true,Last name,,,Please enter your last name.,,100
+email,email,Email,true,you@example.com,,,Please enter your email address.,Please enter a valid email address.,254
+phone,tel,Phone Number,,Phone number,,,,,50
+company,text,Company,,Company,,,,,200
+subject,text,Subject,,Subject,,,,,200
+message,textarea,Message,true,How can we help?,,,Please enter a message.,,5000
+submit,submit,Submit,,,Thank you. Your message has been sent.,REPLACE_WITH_DESTINATION_SPREADSHEET_URL,,,

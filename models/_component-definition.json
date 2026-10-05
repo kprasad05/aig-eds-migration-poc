@@ -1,0 +1,12 @@
+{
+  "groups": [
+    {
+      "title": "Forms",
+      "id": "forms",
+      "components": [
+        { "...": "../blocks/form/_form.json#/definitions" },
+        { "...": "../blocks/embed-adaptive-form/_embed-adaptive-form.json#/definitions" }
+      ]
+    }
+  ]
+}

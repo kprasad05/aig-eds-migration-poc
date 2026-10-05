@@ -1,247 +1,622 @@
-import fetchConfig from '../../scripts/config.js';
-import verifyRecaptcha from '../../scripts/recaptcha-verify.js';
+import { createOptimizedPicture, loadCSS } from '../../scripts/aem.js';
+import transferRepeatableDOM, { insertAddButton, insertRemoveButton } from './components/repeat/repeat.js';
+import {
+  emailPattern, getSubmitBaseUrl, SUBMISSION_SERVICE, SUPPORTED_SUBMISSION_ACTION_TYPES,
+} from './constant.js';
+import GoogleReCaptcha from './integrations/recaptcha.js';
+import componentDecorator from './mappings.js';
+import { handleSubmit } from './submit.js';
+import DocBasedFormToAF from './transform.js';
+import {
+  checkValidation,
+  createButton,
+  createDropdownUsingEnum,
+  createFieldWrapper,
+  createHelpText,
+  createLabel,
+  createRadioOrCheckboxUsingEnum,
+  extractIdFromUrl,
+  getHTMLRenderType,
+  getSitePageName,
+  setConstraints,
+  setPlaceholder,
+  stripTags,
+  createRadioOrCheckbox,
+  createInput,
+} from './util.js';
 
-const RECAPTCHA_API_SRC = 'https://www.google.com/recaptcha/api.js?onload=onRecaptchaApiLoad&render=explicit';
+export const DELAY_MS = 0;
+let captchaField;
+let afModule;
 
-let apiPromise;
+const withFieldWrapper = (element) => (fd) => {
+  const wrapper = createFieldWrapper(fd);
+  wrapper.append(element(fd));
+  return wrapper;
+};
 
-/**
- * Loads Google's reCAPTCHA API script once per page — subsequent calls
- * (including from other Form block instances on the same page) share the
- * same promise. Uses explicit rendering so each block instance renders its
- * own widget and tracks its own widget id independently, rather than
- * relying on implicit auto-render's single global widget id.
- * @returns {Promise<object>} The grecaptcha global, once ready
- */
-function loadRecaptchaApi() {
-  if (!apiPromise) {
-    apiPromise = new Promise((resolve, reject) => {
-      window.onRecaptchaApiLoad = () => resolve(window.grecaptcha);
-      const script = document.createElement('script');
-      script.src = RECAPTCHA_API_SRC;
-      script.async = true;
-      script.defer = true;
-      script.onerror = () => reject(new Error('Failed to load the reCAPTCHA script'));
-      document.head.append(script);
+const createTextArea = withFieldWrapper((fd) => {
+  const input = document.createElement('textarea');
+  setPlaceholder(input, fd);
+  return input;
+});
+
+const createSelect = withFieldWrapper((fd) => {
+  const select = document.createElement('select');
+  createDropdownUsingEnum(fd, select);
+  return select;
+});
+
+function createHeading(fd) {
+  const wrapper = createFieldWrapper(fd);
+  const heading = document.createElement('h2');
+  heading.textContent = fd.value || fd.label.value;
+  heading.id = fd.id;
+  wrapper.append(heading);
+
+  return wrapper;
+}
+
+function createLegend(fd) {
+  return createLabel(fd, 'legend');
+}
+
+function createRepeatablePanel(wrapper, fd) {
+  setConstraints(wrapper, fd);
+  wrapper.dataset.repeatable = true;
+  wrapper.dataset.index = fd.index || 0;
+  if (fd.properties) {
+    Object.keys(fd.properties).forEach((key) => {
+      if (!key.startsWith('fd:')) {
+        wrapper.dataset[key] = fd.properties[key];
+      }
     });
   }
-  return apiPromise;
+  if ((!fd.index || fd?.index === 0) && fd.properties?.variant !== 'noButtons') {
+    insertAddButton(wrapper, wrapper);
+    insertRemoveButton(wrapper, wrapper);
+  }
 }
 
-/**
- * @param {Element} [row] An authored row
- * @returns {string} Its trimmed text content, or '' if the row is absent
- */
-function textOf(row) {
-  return row?.textContent.trim() || '';
+function createFieldSet(fd) {
+  const wrapper = createFieldWrapper(fd, 'fieldset', createLegend);
+  wrapper.id = fd.id;
+  wrapper.name = fd.name;
+  if (fd.fieldType === 'panel') {
+    wrapper.classList.add('panel-wrapper');
+  }
+  if (fd.repeatable === true) {
+    createRepeatablePanel(wrapper, fd);
+  }
+  return wrapper;
 }
 
-/**
- * @param {Element} status The form's status <p>
- * @param {string} message Text to show; hides the element when empty
- */
-function setStatus(status, message) {
-  status.textContent = message;
-  status.hidden = !message;
+function setConstraintsMessage(field, messages = {}) {
+  Object.keys(messages).forEach((key) => {
+    field.dataset[`${key}ErrorMessage`] = messages[key];
+  });
 }
 
-/**
- * Builds the actual <form> markup: Name/Email/Message fields, a container
- * for the reCAPTCHA widget, and a submit button. These three input fields
- * are intentionally fixed, not author-configurable — this block
- * demonstrates CAPTCHA-gated submission, not a general-purpose form
- * builder.
- * @returns {Element} The <form> element, not yet wired up
- */
-function buildForm() {
-  const form = document.createElement('form');
+function createRadioOrCheckboxGroup(fd) {
+  const wrapper = createFieldSet({ ...fd });
+  createRadioOrCheckboxUsingEnum(fd, wrapper);
+  wrapper.dataset.required = fd.required;
+  if (fd.tooltip) {
+    wrapper.title = stripTags(fd.tooltip, '');
+  }
+  setConstraintsMessage(wrapper, fd.constraintMessages);
+  return wrapper;
+}
 
-  [
-    { name: 'name', label: 'Name', type: 'text' },
-    { name: 'email', label: 'Email', type: 'email' },
-  ].forEach(({ name, label, type }) => {
-    const field = document.createElement('div');
-    field.className = 'form-field';
-    const labelEl = document.createElement('label');
-    labelEl.htmlFor = `form-${name}`;
-    labelEl.textContent = label;
-    const input = document.createElement('input');
-    input.type = type;
-    input.id = `form-${name}`;
-    input.name = name;
-    input.required = true;
-    field.append(labelEl, input);
-    form.append(field);
+function createPlainText(fd) {
+  const paragraph = document.createElement('p');
+  if (fd.richText) {
+    paragraph.innerHTML = stripTags(fd.value);
+  } else {
+    paragraph.textContent = fd.value;
+  }
+  const wrapper = createFieldWrapper(fd);
+  wrapper.id = fd.id;
+  wrapper.replaceChildren(paragraph);
+  return wrapper;
+}
+
+function createImage(fd) {
+  const field = createFieldWrapper(fd);
+  field.id = fd?.id;
+  const imagePath = fd.value || fd.properties['fd:repoPath'] || '';
+  const altText = fd.altText || fd.name;
+  field.append(createOptimizedPicture(imagePath, altText));
+  return field;
+}
+
+const fieldRenderers = {
+  'drop-down': createSelect,
+  'plain-text': createPlainText,
+  checkbox: createRadioOrCheckbox,
+  button: createButton,
+  multiline: createTextArea,
+  panel: createFieldSet,
+  radio: createRadioOrCheckbox,
+  'radio-group': createRadioOrCheckboxGroup,
+  'checkbox-group': createRadioOrCheckboxGroup,
+  image: createImage,
+  heading: createHeading,
+};
+
+function colSpanDecorator(field, element) {
+  const colSpan = field['Column Span'] || field.properties?.colspan;
+  if (colSpan && element) {
+    element.classList.add(`col-${colSpan}`);
+  }
+}
+
+const handleFocus = (input, field) => {
+  const editValue = input.getAttribute('edit-value');
+  input.type = field.type;
+  input.value = editValue;
+};
+
+const handleFocusOut = (input) => {
+  const displayValue = input.getAttribute('display-value');
+  input.type = 'text';
+  input.value = displayValue;
+};
+
+function inputDecorator(field, element) {
+  const input = element?.querySelector('input,textarea,select');
+  if (input) {
+    input.id = field.id;
+    input.name = field.name;
+    if (field.tooltip) {
+      input.title = stripTags(field.tooltip, '');
+    }
+    input.readOnly = field.readOnly;
+    input.autocomplete = field.autoComplete ?? 'off';
+    input.disabled = field.enabled === false;
+    if (field.fieldType === 'drop-down' && field.readOnly) {
+      input.disabled = true;
+    }
+    const fieldType = getHTMLRenderType(field);
+    if (['number', 'date', 'text', 'email'].includes(fieldType) && (field.displayFormat || field.displayValueExpression)) {
+      field.type = fieldType;
+      input.setAttribute('edit-value', field.value ?? '');
+      input.setAttribute('display-value', field.displayValue ?? '');
+      input.type = 'text';
+      input.value = field.displayValue ?? '';
+      // Handle mobile touch events to enable native date picker
+      let isMobileTouch = false;
+      input.addEventListener('touchstart', () => {
+        isMobileTouch = true;
+        input.type = field.type;
+        // Set the edit value immediately to prevent empty field
+        const editValue = input.getAttribute('edit-value');
+        if (editValue) {
+          input.value = editValue;
+        }
+      });
+
+      input.addEventListener('focus', () => {
+        // Only change type on desktop or if not already changed by touchstart
+        if (!isMobileTouch && input.type !== field.type) {
+          input.type = field.type;
+        }
+        handleFocus(input, field);
+        // Reset mobile touch flag
+        isMobileTouch = false;
+      });
+      input.addEventListener('blur', () => handleFocusOut(input));
+    } else if (input.type !== 'file') {
+      input.value = field.value ?? '';
+      if (input.type === 'radio' || input.type === 'checkbox') {
+        input.value = field?.enum?.[0] ?? 'on';
+        input.checked = field.value === input.value;
+      }
+    } else {
+      input.multiple = field.type === 'file[]';
+    }
+    if (field.required) {
+      input.setAttribute('required', 'required');
+    }
+    if (field.description) {
+      input.setAttribute('aria-describedby', `${field.id}-description`);
+    }
+    if (field.minItems) {
+      input.dataset.minItems = field.minItems;
+    }
+    if (field.maxItems) {
+      input.dataset.maxItems = field.maxItems;
+    }
+    if (field.maxFileSize) {
+      input.dataset.maxFileSize = field.maxFileSize;
+    }
+    if (field.default !== undefined) {
+      input.setAttribute('value', field.default);
+    }
+    if (input.type === 'email') {
+      input.pattern = emailPattern;
+    }
+    setConstraintsMessage(element, field.constraintMessages);
+    element.dataset.required = field.required;
+  }
+}
+
+function decoratePanelContainer(panelDefinition, panelContainer) {
+  if (!panelContainer) return;
+
+  const isPanelWrapper = (container) => container.classList?.contains('panel-wrapper');
+
+  const shouldAddLabel = (container, panel) => panel.label && !container.querySelector(`legend[for=${container.dataset.id}]`);
+
+  if (isPanelWrapper(panelContainer)) {
+    if (shouldAddLabel(panelContainer, panelDefinition)) {
+      const legend = createLegend(panelDefinition);
+      if (legend) {
+        panelContainer.insertAdjacentElement('afterbegin', legend);
+      }
+    }
+  }
+}
+
+function renderField(fd) {
+  const fieldType = fd?.fieldType?.replace('-input', '') ?? 'text';
+  const renderer = fieldRenderers[fieldType];
+  let field;
+  if (typeof renderer === 'function') {
+    field = renderer(fd);
+  } else {
+    field = createFieldWrapper(fd);
+    field.append(createInput(fd));
+  }
+  if (fd.description) {
+    field.append(createHelpText(fd));
+    field.dataset.description = fd.description; // In case overriden by error message
+  }
+  if (fd.fieldType !== 'radio-group' && fd.fieldType !== 'checkbox-group' && fd.fieldType !== 'captcha') {
+    inputDecorator(fd, field);
+  }
+  return field;
+}
+
+export async function generateFormRendition(panel, container, formId, getItems = (p) => p?.items) {
+  const items = getItems(panel) || [];
+  const promises = items.map(async (field) => {
+    field.value = field.value ?? '';
+    const { fieldType } = field;
+    if (fieldType === 'captcha') {
+      captchaField = field;
+      const element = createFieldWrapper(field);
+      element.textContent = 'CAPTCHA';
+      return element;
+    }
+    const element = renderField(field);
+    if (field.appliedCssClassNames) {
+      element.className += ` ${field.appliedCssClassNames}`;
+    }
+    colSpanDecorator(field, element);
+    if (field?.fieldType === 'panel') {
+      await generateFormRendition(field, element, formId, getItems);
+      return element;
+    }
+    await componentDecorator(element, field, container, formId);
+    return element;
   });
 
-  const messageField = document.createElement('div');
-  messageField.className = 'form-field';
-  const messageLabel = document.createElement('label');
-  messageLabel.htmlFor = 'form-message';
-  messageLabel.textContent = 'Message';
-  const messageInput = document.createElement('textarea');
-  messageInput.id = 'form-message';
-  messageInput.name = 'message';
-  messageInput.rows = 5;
-  messageInput.required = true;
-  messageField.append(messageLabel, messageInput);
-  form.append(messageField);
+  const children = await Promise.all(promises);
+  container.append(...children.filter((_) => _ != null));
+  decoratePanelContainer(panel, container);
+  await componentDecorator(container, panel, null, formId);
+}
 
-  const recaptchaField = document.createElement('div');
-  recaptchaField.className = 'form-recaptcha';
-  form.append(recaptchaField);
+function enableValidation(form) {
+  form.querySelectorAll('input,textarea,select').forEach((input) => {
+    input.addEventListener('invalid', (event) => {
+      checkValidation(event.target);
+    });
+  });
 
-  const status = document.createElement('p');
-  status.className = 'form-status';
-  status.setAttribute('role', 'status');
-  status.setAttribute('aria-live', 'polite');
-  status.hidden = true;
-  form.append(status);
+  form.addEventListener('change', (event) => {
+    checkValidation(event.target);
+  });
+}
 
-  const submit = document.createElement('button');
-  submit.type = 'submit';
-  submit.className = 'button primary';
-  submit.textContent = 'Submit';
-  // stays disabled until the reCAPTCHA widget has actually loaded (see
-  // initRecaptcha) — there's no valid way to submit before then anyway
-  submit.disabled = true;
-  form.append(submit);
+function isDocumentBasedForm(formDef) {
+  return formDef?.[':type'] === 'sheet' && formDef?.data;
+}
 
+async function createFormForAuthoring(formDef) {
+  const form = document.createElement('form');
+  await generateFormRendition(formDef, form, formDef.id, (container) => {
+    if (container[':itemsOrder'] && container[':items']) {
+      return container[':itemsOrder'].map((itemKey) => container[':items'][itemKey]);
+    }
+    return [];
+  });
   return form;
 }
 
-/**
- * Wires up the form's submit flow: reads the reCAPTCHA token, sends it (and
- * the form's field values) to the verify proxy, and either shows a success
- * message, redirects to the CAPTCHA error page, or shows an inline error —
- * gating form processing on a server-verified human check.
- * @param {Element} form The form built by buildForm
- * @param {number} widgetId The rendered reCAPTCHA widget's id
- * @param {string} successMessage Shown on a verified submission
- * @param {string} [errorPageHref] Redirect target on failed verification
- */
-function wireSubmit(form, widgetId, successMessage, errorPageHref) {
-  const status = form.querySelector('.form-status');
-  const submit = form.querySelector('button[type="submit"]');
+export async function createForm(formDef, data, source = 'aem') {
+  const { action: formPath } = formDef;
+  const form = document.createElement('form');
+  form.dataset.action = formPath;
+  form.dataset.source = source;
+  form.noValidate = true;
+  if (formDef.appliedCssClassNames) {
+    form.className = formDef.appliedCssClassNames;
+  }
+  const formId = extractIdFromUrl(formPath); // formDef.id returns $form after getState()
+  await generateFormRendition(formDef, form, formId);
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    setStatus(status, '');
-
-    const token = window.grecaptcha.getResponse(widgetId);
-    if (!token) {
-      setStatus(status, 'Please complete the reCAPTCHA challenge before submitting.');
-      return;
+  let captcha;
+  if (captchaField) {
+    let config = captchaField?.properties?.['fd:captcha']?.config;
+    if (!config) {
+      config = {
+        siteKey: captchaField?.value,
+        uri: captchaField?.uri,
+        version: captchaField?.version,
+      };
     }
+    const pageName = getSitePageName(captchaField?.properties?.['fd:path']);
+    captcha = new GoogleReCaptcha(config, captchaField.id, captchaField.name, pageName);
+    captcha.loadCaptcha(form);
+  }
 
-    const fields = Object.fromEntries(new FormData(form).entries());
-    submit.disabled = true;
-    setStatus(status, 'Submitting…');
+  // Only enable DOM validation for doc-based forms; edge forms use the model.
+  if (source === 'sheet') {
+    enableValidation(form);
+  }
+  transferRepeatableDOM(form, formDef, form, formId);
 
-    let result;
-    try {
-      result = await verifyRecaptcha(token, fields);
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Form: reCAPTCHA verification request failed', error);
-      window.grecaptcha.reset(widgetId);
-      submit.disabled = false;
-      setStatus(status, 'Something went wrong verifying your submission. Please try again.');
-      return;
+  if (afModule && typeof Worker === 'undefined') {
+    window.setTimeout(async () => {
+      afModule.loadRuleEngine(formDef, form, captcha, generateFormRendition, data);
+    }, DELAY_MS);
+  }
+
+  form.addEventListener('reset', async () => {
+    const currentSource = form.dataset.source || 'aem';
+    const response = await createForm(formDef, undefined, currentSource);
+    if (response?.form) {
+      Object.assign(response.form.dataset, form.dataset, { submitting: 'false' });
+      form.replaceWith(response.form);
     }
-
-    if (!result.success) {
-      if (errorPageHref) {
-        window.location.href = errorPageHref;
-        return;
-      }
-      window.grecaptcha.reset(widgetId);
-      submit.disabled = false;
-      setStatus(status, 'We could not verify you are human. Please try again.');
-      return;
-    }
-
-    form.reset();
-    window.grecaptcha.reset(widgetId);
-    submit.disabled = false;
-    setStatus(status, successMessage);
   });
+
+  form.addEventListener('submit', (e) => {
+    handleSubmit(e, form, captcha);
+  });
+
+  return {
+    form,
+    captcha,
+    generateFormRendition,
+    data,
+  };
 }
 
-/**
- * Fetches the config sheet and loads Google's reCAPTCHA script, renders
- * the widget, and wires up the submit flow. Deferred out of decorate()
- * (see the IntersectionObserver below) so a form below the fold doesn't
- * force Google's reCAPTCHA script/iframe into the page's critical
- * loading path — eager-loading it measurably hurts LCP.
- * @param {Element} form The form built by buildForm
- * @param {string} successMessage Shown on a verified submission
- * @param {string} [errorPageHref] Redirect target on failed verification
- */
-async function initRecaptcha(form, successMessage, errorPageHref) {
-  const recaptchaField = form.querySelector('.form-recaptcha');
-  const submit = form.querySelector('button[type="submit"]');
+function cleanUp(content) {
+  const formDef = content.replaceAll('^(([^<>()\\\\[\\\\]\\\\\\\\.,;:\\\\s@\\"]+(\\\\.[^<>()\\\\[\\\\]\\\\\\\\.,;:\\\\s@\\"]+)*)|(\\".+\\"))@((\\\\[[0-9]{1,3}\\\\.[0-9]{1,3}\\\\.[0-9]{1,3}\\\\.[0-9]{1,3}])|(([a-zA-Z\\\\-0-9]+\\\\.)\\+[a-zA-Z]{2,}))$', '');
+  return formDef?.replace(/\x83\n|\n|\s\s+/g, '');
+}
+/*
+  Newer Clean up - Replace backslashes that are not followed by valid json escape characters
+  function cleanUp(content) {
+    return content.replace(/\\/g, (match, offset, string) => {
+      const prevChar = string[offset - 1];
+      const nextChar = string[offset + 1];
+      const validEscapeChars = ['b', 'f', 'n', 'r', 't', '"', '\\'];
+      if (validEscapeChars.includes(nextChar) || prevChar === '\\') {
+        return match;
+      }
+      return '';
+    });
+  }
+*/
 
-  let widgetId;
+function decode(rawContent) {
+  const content = rawContent.trim();
+  if (content.startsWith('"') && content.endsWith('"')) {
+    // In the new 'jsonString' context, Server side code comes as a string with escaped characters,
+    // hence the double parse
+    return JSON.parse(JSON.parse(content));
+  }
+  return JSON.parse(cleanUp(content));
+}
+
+function extractFormDefinition(block) {
+  let formDef;
+  const container = block.querySelector('pre');
+  const codeEl = container?.querySelector('code');
+  const content = codeEl?.textContent;
+  if (content) {
+    formDef = decode(content);
+  }
+  return { container, formDef };
+}
+
+export async function fetchForm(pathname) {
+  // get the main form
+  let data;
+  let path = pathname;
+  if (path.startsWith(window.location.origin) && !path.includes('.json')) {
+    if (path.endsWith('.html')) {
+      path = path.substring(0, path.lastIndexOf('.html'));
+    }
+    path += '/jcr:content/root/section/form.html';
+  }
+  let resp = await fetch(path);
+  if (!resp.ok) throw new Error(`Form definition request failed (${resp.status}): ${path}`);
+
+  if (resp?.headers?.get('Content-Type')?.includes('application/json')) {
+    data = await resp.json();
+  } else if (resp?.headers?.get('Content-Type')?.includes('text/html')) {
+    resp = await fetch(path);
+    if (!resp.ok) throw new Error(`Form definition request failed (${resp.status}): ${path}`);
+    data = await resp.text().then((html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        if (doc) {
+          return extractFormDefinition(doc.body).formDef;
+        }
+        return doc;
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('Unable to fetch form definition for path', pathname, path);
+        return null;
+      }
+    });
+  }
+  if (!data) throw new Error(`No supported form definition found at ${path}`);
+  return data;
+}
+
+function addRequestContextToForm(formDef) {
+  if (formDef && typeof formDef === 'object') {
+    formDef.properties = formDef.properties || {};
+
+    // Add URL parameters
+    try {
+      const urlParams = new URLSearchParams(window?.location?.search || '');
+      if (!formDef.properties.queryParams) {
+        formDef.properties.queryParams = {};
+      }
+      urlParams?.forEach((value, key) => {
+        formDef.properties.queryParams[key?.toLowerCase()] = value;
+      });
+    } catch (e) {
+      console.warn('Error reading URL parameters:', e);
+    }
+
+    // Add cookies
+    try {
+      const cookies = document?.cookie.split(';');
+      formDef.properties.cookies = {};
+      cookies?.forEach((cookie) => {
+        if (cookie.trim()) {
+          const [key, value] = cookie.trim().split('=');
+          formDef.properties.cookies[key.trim()] = value || '';
+        }
+      });
+    } catch (e) {
+      console.warn('Error reading cookies:', e);
+    }
+  }
+}
+
+function loadFormCustomStyles(formDef) {
+  const { style } = formDef?.properties || {};
+  if (style) {
+    try {
+      const base = (window.hlx?.codeBasePath || '').replace(/\/$/, '');
+      const stylePath = style.startsWith('/') ? style : `/${style}`;
+      loadCSS(`${base}${stylePath}`);
+    } catch (error) {
+      console.error('Failed to load form CSS:', error);
+    }
+  }
+}
+
+function shouldRouteToSubmissionService(actionType) {
+  return SUPPORTED_SUBMISSION_ACTION_TYPES.includes(actionType);
+}
+
+async function setupForm(formDef, { pathname, block, editMode = false } = {}) {
+  if (!isDocumentBasedForm(formDef) && !formDef?.adaptiveform && formDef?.fieldType !== 'form') {
+    throw new Error('Unsupported form definition: expected a sheet or Adaptive Form.');
+  }
+  if (isDocumentBasedForm(formDef)
+    && (!Array.isArray(formDef.data) || !formDef.data.some((field) => field?.Type))) {
+    throw new Error('The form definition sheet has no field rows.');
+  }
+  const submitProps = formDef?.properties?.['fd:submit'];
+  const actionType = submitProps?.actionName || formDef?.properties?.actionType;
+  if (shouldRouteToSubmissionService(actionType)) {
+    // Check if we're in an iframe and use parent window path if available
+    const iframePath = window.frameElement ? window.parent.location.pathname
+      : window.location.pathname;
+    formDef.action = SUBMISSION_SERVICE + btoa(pathname || iframePath);
+  } else {
+    formDef.action = getSubmitBaseUrl() + (formDef.action || '');
+  }
+
+  let def = formDef;
+  let form;
+  let afbForm;
+
+  if (isDocumentBasedForm(formDef)) {
+    def = new DocBasedFormToAF().transform(formDef, { block });
+    loadFormCustomStyles(def);
+    form = (await createForm(def, null, 'sheet'))?.form;
+    const docRuleEngine = await import('./rules-doc/index.js');
+    docRuleEngine.default(def, form);
+    form.dataset.source = 'sheet';
+    form.dataset.rules = false;
+  } else {
+    loadFormCustomStyles(formDef);
+    afModule = await import('./rules/index.js');
+    addRequestContextToForm(formDef);
+    if (afModule && afModule.initAdaptiveForm && !editMode) {
+      ({ form, afbForm } = await afModule.initAdaptiveForm(formDef, createForm));
+    } else {
+      form = await createFormForAuthoring(formDef);
+    }
+    form.dataset.source = 'aem';
+    form.dataset.rules = true;
+    if (def.properties && def.properties['fd:path']) {
+      form.dataset.formpath = def.properties['fd:path'];
+    }
+  }
+
+  form.dataset.redirectUrl = def.redirectUrl || '';
+  form.dataset.thankYouMsg = def.thankYouMsg || '';
+  form.dataset.action = def.action || pathname?.split('.json')[0];
+  form.dataset.id = def.id;
+  return { form, afbForm };
+}
+
+export async function renderForm(formDef, element) {
+  const { form, afbForm } = await setupForm(formDef);
+  element.appendChild(form);
+  return { form, afbForm };
+}
+
+async function decorateForm(block) {
+  let container = block.querySelector('a[href]');
+  let formDef;
+  let pathname;
+  if (container) {
+    ({ pathname } = new URL(container.href));
+    formDef = await fetchForm(container.href);
+  } else {
+    ({ container, formDef } = extractFormDefinition(block));
+  }
+  let form;
+  let afbForm;
+  if (formDef) {
+    ({ form, afbForm } = await setupForm(formDef, {
+      pathname,
+      block,
+      editMode: block.classList.contains('edit-mode'),
+    }));
+    container.replaceWith(form);
+  }
+  return { form, afbForm };
+}
+
+export default async function decorate(block) {
   try {
-    const config = await fetchConfig();
-    const siteKey = config['recaptcha-site-key'];
-    if (!siteKey) throw new Error('recaptcha-site-key is not set in the config sheet');
-    const grecaptcha = await loadRecaptchaApi();
-    widgetId = grecaptcha.render(recaptchaField, { sitekey: siteKey });
+    const result = await decorateForm(block);
+    if (!result.form) throw new Error('The Form block needs a link to a valid form definition JSON.');
+    return result;
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.warn('Form: reCAPTCHA is not available', error);
-    recaptchaField.textContent = 'reCAPTCHA is not configured for this form.';
-    return;
+    console.error('Adaptive Form could not be loaded', error);
+    const message = document.createElement('p');
+    message.className = 'form-message error-message';
+    message.setAttribute('role', 'alert');
+    message.textContent = 'This form is temporarily unavailable. Please try again later.';
+    block.replaceChildren(message);
+    throw error;
   }
-
-  submit.disabled = false;
-  wireSubmit(form, widgetId, successMessage, errorPageHref);
-}
-
-/**
- * loads and decorates the block: renders a Name/Email/Message form gated by
- * a Google reCAPTCHA v2 checkbox. The site key comes from the site's config
- * sheet (see scripts/config.js) — it's public, so it's safe to ship
- * client-side; verification happens server-side via
- * scripts/recaptcha-verify.js, which never sees the secret key either.
- *
- * Authored content is read positionally, one row per field:
- *   row 1: Title (text)
- *   row 2: Description (rich text)
- *   row 3: Success message (text)
- *   row 4: Error page (a link, followed on failed verification)
- * @param {Element} block The form block element
- */
-export default function decorate(block) {
-  const rows = [...block.children];
-  const title = textOf(rows[0]);
-  const description = rows[1];
-  const successMessage = textOf(rows[2]) || 'Thanks — your message has been received.';
-  const errorPageHref = rows[3]?.querySelector('a')?.getAttribute('href');
-
-  block.textContent = '';
-
-  if (title) {
-    const heading = document.createElement('h2');
-    heading.textContent = title;
-    block.append(heading);
-  }
-  if (description?.textContent.trim()) {
-    const desc = document.createElement('div');
-    desc.className = 'form-description';
-    desc.append(...description.childNodes);
-    block.append(desc);
-  }
-
-  const form = buildForm();
-  block.append(form);
-
-  const observer = new IntersectionObserver((entries) => {
-    if (!entries.some((entry) => entry.isIntersecting)) return;
-    observer.disconnect();
-    initRecaptcha(form, successMessage, errorPageHref);
-  }, { rootMargin: '200px' });
-  observer.observe(block);
 }

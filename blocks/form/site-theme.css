@@ -1,0 +1,66 @@
+.form {
+  --background-color-primary: var(--background-color);
+  --label-color: var(--text-color);
+  --border-color: var(--dark-color);
+  --form-error-color: #b42318;
+  --form-invalid-border-color: var(--form-error-color);
+  --button-primary-color: var(--link-color);
+  --button-primary-hover-color: var(--link-hover-color);
+  --form-font-size-m: var(--body-font-size-m);
+  --form-font-size-s: var(--body-font-size-s);
+  --form-font-size-xs: var(--body-font-size-xs);
+  --form-input-font-size: var(--body-font-size-s);
+  --form-label-font-weight: 600;
+  --form-field-horz-gap: 16px;
+  --form-button-padding: 0.5em 1.2em;
+  --form-width: 760px;
+
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--form-width);
+  margin-inline: auto;
+  font-family: var(--body-font-family);
+}
+
+main .form form {
+  min-width: 0;
+}
+
+main .form .field-wrapper {
+  min-width: 0;
+}
+
+main .form input,
+main .form textarea,
+main .form select {
+  height: auto;
+  min-height: 44px;
+  color: var(--text-color);
+}
+
+main .form textarea {
+  min-height: 150px;
+  resize: vertical;
+}
+
+main .form button {
+  min-height: 44px;
+  border-radius: 2.4em;
+  font-weight: 500;
+}
+
+main .form button[type="submit"]:hover {
+  border: var(--form-button-border);
+  background-color: var(--form-button-background-hover-color);
+}
+
+main .form :is(input, textarea, select, button):focus-visible {
+  outline: 2px solid var(--link-color);
+  outline-offset: 3px;
+}
+
+@media (width >= 600px) {
+  main .form form :is(.field-firstname, .field-lastname, .field-email, .field-phone, .field-company, .field-subject) {
+    grid-column: span 6;
+  }
+}
