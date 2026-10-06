@@ -1,0 +1,14 @@
+{
+  "filters": [
+    {
+      "id": "section",
+      "components": [
+        "text", "image", "button", "title",
+        "cards-story", "cards", "columns-feature", "columns", "dm-image",
+        "footer", "fragment", "header", "hero-banner", "hero",
+        "search-results", "tabs-solutions", "video-feature", "widget",
+        "forms-recaptcha", "form", "embed-adaptive-form"
+      ]
+    }
+  ]
+}

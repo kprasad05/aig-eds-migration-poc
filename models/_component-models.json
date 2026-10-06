@@ -1,0 +1,4 @@
+[
+  { "...": "../blocks/form/_form.json#/models" },
+  { "...": "../blocks/embed-adaptive-form/_embed-adaptive-form.json#/models" }
+]

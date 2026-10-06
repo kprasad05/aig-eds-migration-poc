@@ -1,5 +1,7 @@
 .hlx/*
 coverage/*
+playwright-report/
+test-results/
 logs/*
 node_modules/*
 .claude/settings.local.json

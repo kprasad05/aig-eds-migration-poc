@@ -1,0 +1,55 @@
+.forms-recaptcha form {
+  display: flex;
+  max-width: 560px;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.forms-recaptcha .form-description {
+  margin: 0 0 8px;
+}
+
+.forms-recaptcha .form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.forms-recaptcha .form-field label {
+  font-weight: 600;
+}
+
+.forms-recaptcha .form-field input,
+.forms-recaptcha .form-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--dark-color);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font: inherit;
+  scroll-margin-top: calc(var(--nav-height) + 16px);
+}
+
+.forms-recaptcha .form-field textarea {
+  resize: vertical;
+}
+
+.forms-recaptcha .form-recaptcha {
+  min-height: 78px;
+}
+
+.forms-recaptcha .form-status {
+  margin: 0;
+  font-weight: 600;
+}
+
+.forms-recaptcha button.button {
+  align-self: flex-start;
+}
+
+@media (width >= 600px) {
+  .forms-recaptcha .form-field input,
+  .forms-recaptcha .form-field textarea {
+    padding: 12px 14px;
+  }
+}
