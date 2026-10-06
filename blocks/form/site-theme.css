@@ -14,11 +14,12 @@
   --form-field-horz-gap: 16px;
   --form-button-padding: 0.5em 1.2em;
   --form-width: 760px;
+  --form-padding: 0;
 
   box-sizing: border-box;
   width: 100%;
   max-width: var(--form-width);
-  margin-inline: auto;
+  margin-inline: 0;
   font-family: var(--body-font-family);
 }
 
@@ -28,6 +29,7 @@ main .form form {
 
 main .form .field-wrapper {
   min-width: 0;
+  margin-inline: 0;
 }
 
 main .form input,
