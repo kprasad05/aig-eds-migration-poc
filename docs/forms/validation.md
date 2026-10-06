@@ -53,6 +53,20 @@ All automated submission responses are **mocked**. All automated CAPTCHA
 responses/proxy calls are **mocked**. Real widget rendering was separately
 checked without solving the challenge or submitting any field values.
 
+## Local alignment correction (October 6, 2026)
+
+The custom `blocks/form/site-theme.css` now left-aligns the form with the
+section heading instead of centering it independently. Horizontal form padding
+and field margins are removed; the 760px maximum width, responsive columns,
+and submission logic are unchanged.
+
+The responsive tests now verify that the first label/input, Message textarea,
+and Submit button align with the heading within 1px at 375px, 768px, 1280px,
+and 1520px. All four checks failed before the CSS correction, reproducing the
+misalignment. After correction, `npm run test:forms` passed all **20 tests**,
+including existing mocked submission and independent reCAPTCHA coverage.
+This is local validation, not evidence that the correction has been deployed.
+
 ## Failed repository-wide check (pre-existing issues)
 
 `npm run lint` fails at its JavaScript phase. A separate final `npm run lint:js`

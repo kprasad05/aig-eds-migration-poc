@@ -223,8 +223,8 @@ test('Adaptive Form CSS does not restyle unrelated inputs', async ({ page }) => 
   expect(originalInput.variables).toBe('');
 });
 
-[375, 768, 1280].forEach((width) => {
-  test(`keeps form inside viewport at ${width}px`, async ({ page }) => {
+[375, 768, 1280, 1520].forEach((width) => {
+  test(`keeps form aligned with heading and inside viewport at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 1000 });
     await loadContact(page);
     await expect(page.getByLabel('Message', { exact: true })).toBeVisible();
@@ -241,6 +241,25 @@ test('Adaptive Form CSS does not restyle unrelated inputs', async ({ page }) => 
     });
     expect(style.columns).toBe(width >= 600 ? 'span 6' : 'span 12');
     expect(style.color).toBe('rgb(52, 55, 65)');
+    const layout = await page.evaluate(() => {
+      const heading = document.querySelector('main h1').getBoundingClientRect();
+      const form = document.querySelector('main .form').getBoundingClientRect();
+      const selectors = [
+        '.form .field-firstname label',
+        '.form .field-firstname input',
+        '.form .field-message textarea',
+        '.form button[type="submit"]',
+      ];
+      return {
+        offsets: selectors.map((selector) => {
+          const { left } = document.querySelector(selector).getBoundingClientRect();
+          return left - heading.left;
+        }),
+        width: form.width,
+      };
+    });
+    layout.offsets.forEach((offset) => expect(Math.abs(offset)).toBeLessThan(1));
+    expect(layout.width).toBeLessThanOrEqual(760);
   });
 });
 
