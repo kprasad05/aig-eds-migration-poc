@@ -1,25 +1,60 @@
 name: Video Sitemap
 
+# APPROACH A — GitHub repo commit (Adobe-managed CDN / no BYO CDN)
+# ─────────────────────────────────────────────────────────────────────────────
+# AEM Edge Delivery Services (Adobe-managed CDN) has no server-side runtime.
+# It can only serve files committed to the GitHub repository.
+# This workflow generates video-sitemap.xml and commits it to main.
+# EDS then serves the committed file at /video-sitemap.xml.
+#
+# APPROACH B — S3 / Azure Blob / GCS upload (BYO CDN or external hosting)
+# ─────────────────────────────────────────────────────────────────────────────
+# If you don't want video-sitemap.xml in the repo, upload it to object storage
+# instead of committing it. The BYO CDN (Cloudflare / Fastly / Akamai) then
+# proxies /video-sitemap.xml → the storage URL, so the file never enters the repo.
+#
+# To switch to Approach B:
+#   1. Add these secrets to the GitHub repo (Settings → Secrets):
+#        AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
+#        SITEMAP_S3_BUCKET  (e.g. my-aig-sitemaps)
+#        SITEMAP_S3_KEY     (e.g. video-sitemap.xml)
+#   2. Comment out the "Commit if changed" step below.
+#   3. Uncomment the "Upload to S3" step below.
+#   4. Configure the CDN to proxy /video-sitemap.xml → the S3 public URL.
+#
+# Azure Blob and GCS equivalents are documented at the bottom of this file.
+# ─────────────────────────────────────────────────────────────────────────────
+
 on:
   schedule:
-    - cron: '0 6 * * *'
+    - cron: '0 6 * * *'   # daily at 06:00 UTC
   workflow_dispatch: {}
 
 jobs:
   generate:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write   # needed for Approach A (git commit); safe to keep for B too
+
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
         with:
           ref: main
-      - name: Use Node.js 20
-        uses: actions/setup-node@v6
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
         with:
           node-version: 24
+
       - name: Generate video-sitemap.xml
         run: node tools/generate-video-sitemap.js
+        env:
+          # Override origin if needed (defaults to the AEM Live host in the script)
+          # SITE_HOST: https://www.aig.com
+
+      # ── APPROACH A: commit the file to the repo ──────────────────────────
+      # EDS serves the committed file directly. No CDN config needed.
+      # Comment this step out when using Approach B.
       - name: Commit if changed
         run: |
           git add video-sitemap.xml
@@ -31,3 +66,59 @@ jobs:
           else
             echo "No changes to video-sitemap.xml"
           fi
+
+      # ── APPROACH B: upload to Amazon S3 ─────────────────────────────────
+      # Uncomment this step (and comment out "Commit if changed" above) to
+      # store the sitemap in S3 instead of the repo.
+      #
+      # Required secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+      #                   AWS_REGION, SITEMAP_S3_BUCKET, SITEMAP_S3_KEY
+      #
+      # - name: Upload to S3
+      #   uses: aws-actions/configure-aws-credentials@v4
+      #   with:
+      #     aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     aws-region: ${{ secrets.AWS_REGION }}
+      #
+      # - name: Push sitemap to S3
+      #   run: |
+      #     aws s3 cp video-sitemap.xml \
+      #       s3://${{ secrets.SITEMAP_S3_BUCKET }}/${{ secrets.SITEMAP_S3_KEY }} \
+      #       --content-type "application/xml" \
+      #       --cache-control "public, max-age=3600"
+      #   # Public access: ensure the bucket policy allows s3:GetObject for *
+      #   # or serve via CloudFront in front of the bucket.
+
+      # ── APPROACH B (Azure): upload to Azure Blob Storage ─────────────────
+      # Required secrets: AZURE_STORAGE_CONNECTION_STRING, AZURE_CONTAINER,
+      #                   SITEMAP_BLOB_NAME
+      #
+      # - name: Upload to Azure Blob
+      #   uses: azure/cli@v2
+      #   with:
+      #     inlineScript: |
+      #       az storage blob upload \
+      #         --connection-string "${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" \
+      #         --container-name "${{ secrets.AZURE_CONTAINER }}" \
+      #         --name "${{ secrets.SITEMAP_BLOB_NAME }}" \
+      #         --file video-sitemap.xml \
+      #         --content-type "application/xml" \
+      #         --overwrite
+
+      # ── APPROACH B (GCS): upload to Google Cloud Storage ─────────────────
+      # Required secrets: GCS_CREDENTIALS_JSON, GCS_BUCKET, SITEMAP_GCS_KEY
+      #
+      # - name: Auth GCS
+      #   uses: google-github-actions/auth@v2
+      #   with:
+      #     credentials_json: ${{ secrets.GCS_CREDENTIALS_JSON }}
+      #
+      # - name: Upload to GCS
+      #   uses: google-github-actions/upload-cloud-storage@v2
+      #   with:
+      #     path: video-sitemap.xml
+      #     destination: ${{ secrets.GCS_BUCKET }}/${{ secrets.SITEMAP_GCS_KEY }}
+      #     headers: |-
+      #       content-type: application/xml
+      #       cache-control: public, max-age=3600

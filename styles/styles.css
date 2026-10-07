@@ -85,6 +85,21 @@ footer .footer[data-block-status="loaded"] {
   visibility: visible;
 }
 
+/* ── no-nav pages ─────────────────────────────────────────────────────────────
+   When a page sets the metadata field  no-nav: true  the JS skips loading the
+   header and footer blocks entirely and adds this class to <body>.  The rules
+   below collapse the space those elements would normally occupy so the main
+   content fills the full viewport from the top.
+   ──────────────────────────────────────────────────────────────────────────── */
+body.no-nav header,
+body.no-nav footer {
+  display: none;
+}
+
+body.no-nav main > .section:first-of-type {
+  margin-top: 0;
+}
+
 h1,
 h2,
 h3,

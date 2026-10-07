@@ -23,6 +23,9 @@ indices:
       hidenav:
         select: head > meta[name="hidenav"]
         value: attribute(el, "content")
+      no-nav:
+        select: head > meta[name="no-nav"]
+        value: attribute(el, "content")
       bodyText:
         select: main
         value: words(textContent(el), 0, 300)
