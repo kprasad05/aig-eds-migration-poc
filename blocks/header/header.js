@@ -344,9 +344,13 @@ export default async function decorate(block) {
     if (brandLink) brandLink.classList.add('nav-logo');
   }
 
-  // Primary nav items with flyout panels
+  // Hide nav-sections when page metadata sets no-nav: true
+  const noNav = /^(true|yes|1)$/i.test((getMetadata('no-nav') || '').trim());
   const navSections = nav.querySelector('.nav-sections');
-  if (navSections) {
+  if (navSections && noNav) {
+    navSections.remove();
+    nav.classList.add('no-nav-sections');
+  } else if (navSections) {
     const topList = navSections.querySelector('ul');
     if (topList) topList.classList.add('nav-list');
     navSections.querySelectorAll(':scope ul > li').forEach((li) => {

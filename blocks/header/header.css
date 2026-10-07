@@ -155,6 +155,13 @@ header nav .nav-sections .nav-item[aria-expanded='true'] .nav-item-toggle::befor
   }
 }
 
+/* When nav-sections is hidden (no-nav page), push tools to the far right */
+@media (width >= 900px) {
+  header nav.no-nav-sections .nav-tools {
+    margin-left: auto;
+  }
+}
+
 /* Tools (search, worldwide, login) */
 header nav .nav-tools {
   grid-area: tools;
