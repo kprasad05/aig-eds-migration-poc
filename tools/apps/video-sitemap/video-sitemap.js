@@ -184,10 +184,14 @@ async function publishSitemapInDa(org, repo) {
   const base = `https://admin.hlx.page`;
   const path = `/${org}/${repo}/main/video-sitemap.xml`;
 
+  // admin.hlx.page /preview and /live endpoints expect a body-less POST.
+  // Sending Content-Type causes a 415; we must send no body and no content-type.
+  const hlxOpts = { method: 'POST', headers: {}, body: null };
+
   // Step 1: Preview (required before live for DA-sourced content)
   const previewUrl = `${CORS_PROXY}?url=${encodeURIComponent(`${base}/preview${path}`)}`;
   try {
-    const previewResp = await daFetch(previewUrl, { method: 'POST' });
+    const previewResp = await daFetch(previewUrl, hlxOpts);
     if (!previewResp.ok) {
       const text = await previewResp.text().catch(() => '');
       return { success: false, error: `Preview failed (${previewResp.status}): ${text}` };
@@ -199,7 +203,7 @@ async function publishSitemapInDa(org, repo) {
   // Step 2: Publish to live
   const liveUrl = `${CORS_PROXY}?url=${encodeURIComponent(`${base}/live${path}`)}`;
   try {
-    const liveResp = await daFetch(liveUrl, { method: 'POST' });
+    const liveResp = await daFetch(liveUrl, hlxOpts);
     if (!liveResp.ok) {
       const text = await liveResp.text().catch(() => '');
       return { success: false, error: `Publish to live failed (${liveResp.status}): ${text}` };
