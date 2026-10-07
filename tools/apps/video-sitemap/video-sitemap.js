@@ -168,34 +168,46 @@ async function writeSitemapToDa(org, repo, xml) {
 }
 
 /**
- * Publish video-sitemap.xml via the DA Admin publish API.
+ * Preview then publish video-sitemap.xml via the AEM Helix Admin API.
  *
- * POST https://admin.da.live/publish/{org}/{repo}/video-sitemap.xml
+ * Uses exactly the same pattern as publishContent() in publish-requests-inbox/api.js:
+ *   CORS_PROXY?url=https://admin.hlx.page/...  with daFetch and { method: 'POST' } ONLY.
+ *   - URL must NOT be encodeURIComponent'd in the ?url= parameter
+ *   - Options must be ONLY { method: 'POST' } — no headers:{} no body:null
+ *     (any extra property causes daFetch to inject Content-Type → 415)
  *
- * This endpoint publishes a file that was previously written to DA source
- * via PUT /source/... It is the correct endpoint for non-HTML binary/text
- * files stored in DA (not admin.hlx.page which is for DA document pages).
+ * Step 1: POST preview  — syncs DA source file into AEM preview cache
+ * Step 2: POST live     — promotes preview to CDN (serves at *.aem.live)
  *
- * The 404 we saw earlier was because the file did not yet exist in DA source
- * at the time of the publish call. Now that writeSitemapToDa() runs first,
- * the file exists and this endpoint works correctly.
- *
- * admin.da.live accepts the da.live iframe origin natively — no CORS proxy needed.
  * @param {string} org
  * @param {string} repo
  * @returns {Promise<Object>} { success, error? }
  */
 async function publishSitemapInDa(org, repo) {
-  const url = `${DA_ADMIN}/publish/${org}/${repo}/video-sitemap.xml`;
+  const previewUrl = `${CORS_PROXY}?url=https://admin.hlx.page/preview/${org}/${repo}/main/video-sitemap.xml`;
+  const liveUrl = `${CORS_PROXY}?url=https://admin.hlx.page/live/${org}/${repo}/main/video-sitemap.xml`;
+
+  // Step 1: Preview
   try {
-    const resp = await daFetch(url, { method: 'POST' });
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => '');
-      return { success: false, error: `DA publish failed (${resp.status}): ${text}` };
+    const previewResp = await daFetch(previewUrl, { method: 'POST' });
+    if (!previewResp.ok) {
+      const text = await previewResp.text().catch(() => '');
+      return { success: false, error: `Preview step failed (${previewResp.status}): ${text}` };
+    }
+  } catch (err) {
+    return { success: false, error: `Preview request error: ${err.message}` };
+  }
+
+  // Step 2: Live
+  try {
+    const liveResp = await daFetch(liveUrl, { method: 'POST' });
+    if (!liveResp.ok) {
+      const text = await liveResp.text().catch(() => '');
+      return { success: false, error: `Live publish step failed (${liveResp.status}): ${text}` };
     }
     return { success: true };
   } catch (err) {
-    return { success: false, error: err.message || 'DA publish request failed' };
+    return { success: false, error: `Live publish request error: ${err.message}` };
   }
 }
 
