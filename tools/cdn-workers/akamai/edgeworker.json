@@ -1,0 +1,7 @@
+{
+  "edgeworker-version": "1.0.0",
+  "description": "AIG video sitemap generator — serves /video-sitemap.xml from video-index.json",
+  "misc": {
+    "author": "AIG EDS Team"
+  }
+}

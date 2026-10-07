@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sitemap: Git Commitment, Branch Configuration &amp; Multi-Tenancy</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 15px; line-height: 1.65; color: #1a1a2e; background: #f8f9fb; margin: 0; padding: 0;
+    }
+    .page-wrapper { max-width: 960px; margin: 0 auto; padding: 0 24px 80px; }
+    .doc-header {
+      background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+      color: #fff; padding: 48px 40px 36px; border-radius: 0 0 12px 12px; margin-bottom: 40px;
+    }
+    .doc-header h1 { font-size: 1.9rem; font-weight: 700; margin: 0 0 10px; line-height: 1.25; }
+    .doc-header .scope {
+      font-size: 0.85rem; opacity: 0.75;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      background: rgba(255,255,255,0.12); display: inline-block; padding: 4px 10px; border-radius: 4px;
+    }
+    .toc { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px 28px; margin-bottom: 40px; }
+    .toc h2 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin: 0 0 12px; }
+    .toc ol { margin: 0; padding-left: 20px; }
+    .toc li { margin: 5px 0; }
+    .toc a { color: #0f3460; text-decoration: none; font-weight: 500; }
+    .toc a:hover { text-decoration: underline; }
+    .section { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 32px 36px; margin-bottom: 32px; }
+    .section-title {
+      font-size: 1.25rem; font-weight: 700; color: #0f3460;
+      margin: 0 0 20px; padding-bottom: 12px; border-bottom: 2px solid #e8f0fe;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-title .num {
+      background: #0f3460; color: #fff; font-size: 0.8rem; font-weight: 700;
+      padding: 2px 8px; border-radius: 4px; flex-shrink: 0;
+    }
+    .subsection { margin: 28px 0 0; }
+    .subsection-title {
+      font-size: 1rem; font-weight: 600; color: #1e3a5f;
+      margin: 0 0 12px; display: flex; align-items: baseline; gap: 8px;
+    }
+    .subsection-title .sub-num { color: #64748b; font-size: 0.8rem; font-weight: 500; flex-shrink: 0; }
+    h4 { font-size: 0.95rem; font-weight: 600; color: #334155; margin: 20px 0 8px; }
+    p { margin: 0 0 14px; }
+    .table-wrap { overflow-x: auto; margin: 16px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    thead th { background: #f1f5f9; font-weight: 600; color: #334155; text-align: left; padding: 9px 14px; border: 1px solid #e2e8f0; }
+    tbody td { padding: 8px 14px; border: 1px solid #e2e8f0; vertical-align: top; }
+    tbody tr:nth-child(even) td { background: #f8fafc; }
+    pre {
+      background: #1e2a3a; color: #e2e8f0; border-radius: 8px; padding: 16px 20px;
+      overflow-x: auto; font-size: 0.82rem; line-height: 1.55; margin: 14px 0;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    }
+    code {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.87em; background: #f1f5f9; color: #c7254e; padding: 2px 5px; border-radius: 3px;
+    }
+    pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
+    .callout {
+      border-radius: 8px; padding: 12px 16px; margin: 16px 0;
+      font-size: 0.9rem; display: flex; gap: 10px; align-items: flex-start;
+    }
+    .callout-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+    .callout.warn  { background: #fffbeb; border-left: 4px solid #f59e0b; }
+    .callout.info  { background: #eff6ff; border-left: 4px solid #3b82f6; }
+    .callout.ok    { background: #f0fdf4; border-left: 4px solid #22c55e; }
+    .badge { display: inline-block; font-size: 0.78rem; font-weight: 600; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+    .badge-yes  { background: #dcfce7; color: #166534; }
+    .badge-no   { background: #fee2e2; color: #991b1b; }
+    .badge-warn { background: #fef3c7; color: #92400e; }
+    .flow-diagram {
+      background: #1e2a3a; color: #e2e8f0; border-radius: 8px; padding: 16px 20px;
+      font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.82rem;
+      line-height: 1.7; margin: 14px 0; white-space: pre; overflow-x: auto;
+    }
+    .option-list { list-style: none; padding: 0; margin: 0; }
+    .option-list li { border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
+    .option-list li .opt-label { font-weight: 700; color: #0f3460; margin-bottom: 6px; }
+    .quick-ref {
+      background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+      border: 1px solid #bae6fd; border-radius: 10px; padding: 24px 28px; margin-bottom: 32px;
+    }
+    .quick-ref h2 { color: #0369a1; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 16px; }
+    .related-files { background: #f8f9fb; border: 1px solid #e2e8f0; border-radius: 10px; padding: 24px 28px; }
+    .related-files h2 { font-size: 1rem; color: #334155; margin: 0 0 16px; }
+    ul, ol { margin: 0 0 14px; padding-left: 22px; }
+    li { margin-bottom: 6px; }
+    strong { color: #1e3a5f; }
+    hr { border: none; border-top: 1px solid #e2e8f0; margin: 28px 0; }
+    a { color: #0f3460; }
+  </style>
+</head>
+<body>
+
+<div class="doc-header">
+  <div class="page-wrapper" style="padding-top:0;padding-bottom:0;">
+    <h1>Sitemap: Git Commitment, Branch Configuration &amp; Multi-Tenancy</h1>
+    <span class="scope">kprasad05/aig-eds-migration-poc &nbsp;·&nbsp; branch: main</span>
+  </div>
+</div>
+
+<div class="page-wrapper">
+
+  <!-- TOC -->
+  <div class="toc">
+    <h2>Contents</h2>
+    <ol>
+      <li><a href="#s1">Is the Generated Sitemap XML Committed to the Git Repo?</a></li>
+      <li><a href="#s2">Is the Branch the Same as the One Configured for the Site?</a></li>
+      <li><a href="#s3">How Does It Support Multi-Tenancy?</a></li>
+      <li><a href="#s4">Will It Cause PR Merge Conflicts (Fast-Forward Not Allowed)?</a></li>
+      <li><a href="#s5">Can Template and Publishdate Be Automated for the Article RSS Feed?</a></li>
+      <li><a href="#s6">What Is the Body Selector Limitation of helix-shared-indexer (4.6.1)?</a></li>
+      <li><a href="#qr">Quick Reference</a></li>
+      <li><a href="#rf">Related Files</a></li>
+    </ol>
+  </div>
+
+  <!-- ── Section 1 ── -->
+  <div class="section" id="s1">
+    <div class="section-title"><span class="num">1</span> Is the Generated Sitemap XML Committed to the Git Repo?</div>
+    <p>There are <strong>three feed artifacts</strong> in this project. Each has a different generation and storage mechanism.</p>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">1.1</span> /sitemap.xml — Standard Page Sitemap</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Attribute</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Committed to Git?</strong></td><td><span class="badge badge-no">❌ No</span></td></tr>
+          <tr><td><strong>Generation</strong></td><td>Platform-generated at runtime by AEM EDS</td></tr>
+          <tr><td><strong>Source data</strong></td><td><code>/query-index.json</code> (built by the EDS indexing pipeline)</td></tr>
+          <tr><td><strong>Config files</strong></td><td><code>helix-query.yaml</code>, <code>helix-sitemap.yaml</code></td></tr>
+        </tbody>
+      </table></div>
+      <p><code>helix-sitemap.yaml</code> instructs the EDS platform to read <code>query-index.json</code> and serve <code>/sitemap.xml</code> dynamically. No file is ever written to the repository.</p>
+<pre><code># helix-sitemap.yaml
+sitemaps:
+  aig-eds-migration-poc:
+    source: /query-index.json
+    destination: /sitemap.xml
+    lastmod: YYYY-MM-DD</code></pre>
+      <p><code>helix-query.yaml</code> defines the <code>query-index</code> that feeds it — indexing <code>title</code>, <code>description</code>, <code>image</code>, <code>lastModified</code>, <code>robots</code>, <code>hidenav</code>, and <code>bodyText</code> from every published page.</p>
+      <p><strong>To verify:</strong> <code>curl https://main--aig-eds-migration-poc--kprasad05.aem.live/sitemap.xml</code></p>
+    </div>
+
+    <hr>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">1.2</span> video-sitemap.xml — Video Sitemap</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Attribute</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Committed to Git?</strong></td><td><span class="badge badge-yes">✅ Yes</span> — file exists at repo root, tracked by Git</td></tr>
+          <tr><td><strong>Generation</strong></td><td><code>tools/generate-video-sitemap.js</code> (Node.js script)</td></tr>
+          <tr><td><strong>Trigger</strong></td><td>Daily cron (<code>0 6 * * *</code> UTC) + manual <code>workflow_dispatch</code></td></tr>
+          <tr><td><strong>Workflow file</strong></td><td><code>.github/workflows/video-sitemap.yaml</code></td></tr>
+          <tr><td><strong>Commit author</strong></td><td><code>github-actions[bot]</code></td></tr>
+          <tr><td><strong>Commit message</strong></td><td><code>chore: update video-sitemap.xml</code></td></tr>
+        </tbody>
+      </table></div>
+      <p><strong>How data flows:</strong></p>
+      <div class="flow-diagram">helix-query.yaml (video-index)
+        │
+        ▼
+/video-index.json  (EDS index, live environment)
+        │
+        ▼
+tools/generate-video-sitemap.js
+        │  fetches video-index.json
+        │  filters rows where videourl is set
+        │  builds Google Video Sitemap XML
+        ▼
+video-sitemap.xml  ──►  committed to main branch
+        │
+        ▼
+Served as static file: /video-sitemap.xml</div>
+      <p><strong>Workflow commit logic:</strong></p>
+<pre><code>- name: Commit if changed
+  run: |
+    git add video-sitemap.xml
+    if ! git diff --cached --quiet -- video-sitemap.xml; then
+      git config user.name "github-actions[bot]"
+      git config user.email "github-actions[bot]@users.noreply.github.com"
+      git commit -m "chore: update video-sitemap.xml"
+      git push
+    else
+      echo "No changes to video-sitemap.xml"
+    fi</code></pre>
+      <div class="callout warn">
+        <span class="callout-icon">⚠️</span>
+        <div><strong>Known past bug (now fixed):</strong> The workflow originally ran <code>git diff --quiet</code> <em>before</em> staging, so a never-committed <code>video-sitemap.xml</code> always appeared unchanged. The fix stages first (<code>git add</code>), then diffs with <code>--cached</code>. Confirm this fix is merged before trusting the daily automation.</div>
+      </div>
+      <p><strong>Currently committed content:</strong> 5 video entries (all under <code>/drafts/</code>), covering YouTube and direct <code>.mp4</code> links.</p>
+    </div>
+
+    <hr>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">1.3</span> article-really-simple-syndication.rss — Article RSS Feed</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Attribute</th><th>Detail</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Committed to Git?</strong></td><td><span class="badge badge-yes">✅ Yes</span> — file exists at repo root, tracked by Git</td></tr>
+          <tr><td><strong>Generation</strong></td><td><code>tools/generate-article-rss.js</code> (Node.js script)</td></tr>
+          <tr><td><strong>Trigger</strong></td><td>Daily cron (<code>0 6 * * *</code> UTC) + manual <code>workflow_dispatch</code></td></tr>
+          <tr><td><strong>Workflow file</strong></td><td><code>.github/workflows/article-rss.yaml</code></td></tr>
+          <tr><td><strong>Commit author</strong></td><td><code>github-actions[bot]</code></td></tr>
+          <tr><td><strong>Commit message</strong></td><td><code>chore: update article-really-simple-syndication.rss</code></td></tr>
+        </tbody>
+      </table></div>
+      <p><strong>Inclusion criteria:</strong></p>
+      <ul>
+        <li>Path must be under <code>/articles/</code></li>
+        <li>Page metadata <code>template</code> must equal <code>Article Template</code></li>
+      </ul>
+      <p><strong>Data flow:</strong> <code>helix-query.yaml</code> → <code>article-index</code> → <code>/article-index.json</code> → generator script → committed RSS file → served as static file.</p>
+      <div class="callout info">
+        <span class="callout-icon">ℹ️</span>
+        <div><strong>Known gap:</strong> No pages are currently published under <code>/articles/</code>, so the feed contains zero items until real content is authored there.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Section 2 ── -->
+  <div class="section" id="s2">
+    <div class="section-title"><span class="num">2</span> Is the Branch the Same as the One Configured for the Site?</div>
+    <p><strong>Yes — <code>main</code> is used consistently across all layers.</strong></p>
+
+    <div class="subsection">
+      <div class="subsection-title">EDS URL Structure Confirms the Branch</div>
+<pre><code>https://{branch}--{site}--{org}.aem.live
+         ^^^^^^
+         main
+
+This project: https://main--aig-eds-migration-poc--kprasad05.aem.live</code></pre>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">GitHub Actions Workflows Check Out <code>main</code></div>
+      <p>Both artifact-generating workflows hard-code <code>ref: main</code>:</p>
+<pre><code># .github/workflows/video-sitemap.yaml  &amp;  article-rss.yaml
+- uses: actions/checkout@v7
+  with:
+    ref: main</code></pre>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Generator Script Defaults to <code>main</code> Environment</div>
+<pre><code>// tools/generate-video-sitemap.js
+const DEFAULT_HOST = 'https://main--aig-eds-migration-poc--kprasad05.aem.live';
+const host = process.argv[2] || process.env.SITE_HOST || DEFAULT_HOST;</code></pre>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Branch Consistency Summary</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Layer</th><th>Branch / Environment</th></tr></thead>
+        <tbody>
+          <tr><td>EDS site configuration</td><td><code>main</code></td></tr>
+          <tr><td><code>helix-sitemap.yaml</code> / <code>helix-query.yaml</code></td><td><code>main</code> (read by EDS from repo root)</td></tr>
+          <tr><td><code>video-sitemap.yaml</code> workflow checkout</td><td><code>main</code> (<code>ref: main</code>)</td></tr>
+          <tr><td><code>article-rss.yaml</code> workflow checkout</td><td><code>main</code> (<code>ref: main</code>)</td></tr>
+          <tr><td>Generator script default host</td><td><code>main</code> (<code>main--...--.aem.live</code>)</td></tr>
+          <tr><td>Committed artifacts</td><td><code>main</code> (pushed by workflow)</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- ── Section 3 ── -->
+  <div class="section" id="s3">
+    <div class="section-title"><span class="num">3</span> How Does It Support Multi-Tenancy?</div>
+    <p>AEM EDS multi-tenancy is <strong>platform-native</strong> — encoded in the URL structure, not in any application-level tenant configuration within this repository.</p>
+
+    <div class="subsection">
+      <div class="subsection-title">EDS URL = Tenant Identity</div>
+<pre><code>https://{branch}--{site}--{org}.aem.live
+                  ^^^^    ^^^
+                  repo    GitHub org</code></pre>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Segment</th><th>This Project</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td><code>branch</code></td><td><code>main</code></td><td>Code/content version</td></tr>
+          <tr><td><code>site</code></td><td><code>aig-eds-migration-poc</code></td><td>The tenant site (= repo name)</td></tr>
+          <tr><td><code>org</code></td><td><code>kprasad05</code></td><td>GitHub organization/owner</td></tr>
+        </tbody>
+      </table></div>
+      <p>Each <code>org + site + branch</code> combination maps to a completely isolated EDS environment with its own content index, platform-generated <code>/sitemap.xml</code>, and configuration files.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">Multi-Tenancy Per Sitemap Type</div>
+      <h4>/sitemap.xml (Platform-Generated)</h4>
+      <ul>
+        <li>Fully isolated per tenant by the EDS platform — each tenant has its own <code>query-index.json</code>.</li>
+        <li>No code changes needed; isolation is automatic.</li>
+      </ul>
+      <h4>video-sitemap.xml &amp; article-really-simple-syndication.rss (Committed)</h4>
+      <p>Generator scripts are tenant-configurable via CLI arg or env var:</p>
+<pre><code>node tools/generate-video-sitemap.js https://main--other-site--other-org.aem.live
+# or: SITE_HOST=https://main--other-site--other-org.aem.live in the workflow</code></pre>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title">The One-Repo-Per-Tenant Model</div>
+<pre><code>kprasad05/aig-eds-migration-poc        other-org/other-site
+  ├── helix-sitemap.yaml                 ├── helix-sitemap.yaml
+  ├── helix-query.yaml                   ├── helix-query.yaml
+  ├── video-sitemap.xml                  ├── video-sitemap.xml
+  └── .github/workflows/                 └── .github/workflows/
+  (tenant A)                             (tenant B)</code></pre>
+      <p><strong>Each tenant is a separate GitHub repository.</strong> Tenancy is achieved by the EDS platform's <code>org + site + branch</code> URL scheme — there is no runtime routing or tenant-selection logic in application code.</p>
+    </div>
+  </div>
+
+  <!-- ── Section 4 ── -->
+  <div class="section" id="s4">
+    <div class="section-title"><span class="num">4</span> Will It Cause PR Merge Conflicts (Fast-Forward Not Allowed)?</div>
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <div><strong>Yes — this is a real risk.</strong> The workflows push commits <em>directly to <code>main</code></em>, bypassing PRs. Any in-flight PR will have a diverged history the moment a bot commit lands.</div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">4.1</span> How the Conflict Arises</div>
+<pre><code>time ──►
+main:           A ── B ── C  (developer PR merged)
+                          └── bot commit D  (chore: update video-sitemap.xml)
+feature-branch: A ── B ── X ── Y  (developer's in-flight PR)</code></pre>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Scenario</th><th>What Happens</th></tr></thead>
+        <tbody>
+          <tr><td>Bot commits <code>video-sitemap.xml</code> while a PR also touches it</td><td><strong>Hard merge conflict</strong> — Git cannot auto-resolve.</td></tr>
+          <tr><td>Bot commits while a PR does <strong>not</strong> touch it</td><td>PR branch is <strong>behind <code>main</code></strong> — may block merge if "Require branches to be up to date" is enforced.</td></tr>
+          <tr><td>Bot commits run when no PRs are open</td><td>No conflict — clean fast-forward is possible for the next PR.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">4.2</span> Current Repo State</div>
+      <div class="callout ok">
+        <span class="callout-icon">✅</span>
+        <div>No branch protection rules are currently configured. "Require linear history" and "Require branches to be up to date" are both <strong>not enforced</strong>. Direct pushes by <code>github-actions[bot]</code> are allowed.</div>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>File</th><th>Bot commits it?</th><th>Developer likely to touch it?</th><th>Conflict Risk</th></tr></thead>
+        <tbody>
+          <tr><td><code>video-sitemap.xml</code></td><td><span class="badge badge-yes">✅ Daily</span></td><td>Possible (if manually regenerating)</td><td><span class="badge badge-warn">⚠️ Medium</span></td></tr>
+          <tr><td><code>article-really-simple-syndication.rss</code></td><td><span class="badge badge-yes">✅ Daily</span></td><td>Unlikely</td><td><span class="badge badge-yes">🟢 Low</span></td></tr>
+          <tr><td><code>helix-sitemap.yaml</code></td><td><span class="badge badge-no">❌ No</span></td><td>Possible (config changes)</td><td><span class="badge badge-yes">🟢 None from bot</span></td></tr>
+          <tr><td><code>helix-query.yaml</code></td><td><span class="badge badge-no">❌ No</span></td><td>Possible (index changes)</td><td><span class="badge badge-yes">🟢 None from bot</span></td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">4.3</span> Mitigations</div>
+      <ul class="option-list">
+        <li>
+          <div class="opt-label">Option A — .gitattributes merge strategy (recommended)</div>
+          <p>Mark bot-committed files to always prefer the regenerated version on conflict:</p>
+<pre><code># .gitattributes
+video-sitemap.xml                       merge=ours
+article-really-simple-syndication.rss   merge=ours</code></pre>
+        </li>
+        <li>
+          <div class="opt-label">Option B — Rebase-before-merge policy</div>
+<pre><code>git fetch origin
+git rebase origin/main
+git push --force-with-lease</code></pre>
+          <p>Bot commits are small (<code>chore: update ...</code>) and trivial to rebase over.</p>
+        </li>
+        <li>
+          <div class="opt-label">Option C — Schedule bot off-peak</div>
+          <p>Both workflows run at <code>0 6 * * *</code> UTC (11:30 AM IST). Rescheduling to <code>0 0 * * *</code> (05:30 AM IST, before the workday) reduces the overlap window.</p>
+        </li>
+        <li>
+          <div class="opt-label">Option D — Dedicated bot branch + auto-PR</div>
+          <p>Push bot output to <code>bot/update-video-sitemap</code> and open a PR to <code>main</code> instead of pushing directly — keeps <code>main</code> clean but adds merge latency.</p>
+        </li>
+        <li>
+          <div class="opt-label">Option E — Scope branch protection to status checks only</div>
+          <p>Require lint/build status checks to pass without requiring the branch to be fully up to date — allows merging even if the bot has pushed since branching.</p>
+        </li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">4.4</span> Summary</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Question</th><th>Answer</th></tr></thead>
+        <tbody>
+          <tr><td>Can bot commits cause a non-fast-forward state?</td><td><span class="badge badge-yes">✅ Yes, every daily run</span></td></tr>
+          <tr><td>Is "Require linear history" enforced on <code>main</code>?</td><td><span class="badge badge-no">❌ No</span></td></tr>
+          <tr><td>Is "Require branches to be up to date" enforced?</td><td><span class="badge badge-no">❌ No</span></td></tr>
+          <tr><td>Can a hard merge conflict occur today?</td><td>⚠️ Only if a developer manually edits <code>video-sitemap.xml</code> or the RSS file while a bot run is in flight</td></tr>
+          <tr><td>Recommended mitigation</td><td>Rebase policy + <code>.gitattributes</code> merge strategy for bot-managed files</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- ── Section 5 ── -->
+  <div class="section" id="s5">
+    <div class="section-title"><span class="num">5</span> Can Template and Publishdate Be Automated for the Article RSS Feed?</div>
+    <p><strong>Yes — both fields can be partially or fully automated</strong>, depending on the authoring convention chosen.</p>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">5.1</span> Current State: Both Fields Are Manually Authored</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Field</th><th>Where It Lives</th><th>How It's Set</th></tr></thead>
+        <tbody>
+          <tr><td><code>Template</code></td><td>Page metadata (<code>&lt;meta name="template"&gt;</code>)</td><td>Author manually types <code>Article Template</code> in the metadata table</td></tr>
+          <tr><td><code>Publishdate</code></td><td>Page metadata (<code>&lt;meta name="publishdate"&gt;</code>)</td><td>Author manually types a date string in the metadata table</td></tr>
+        </tbody>
+      </table></div>
+      <p>The generator already has a fallback: if <code>publishdate</code> is absent it uses <code>lastModified</code> (the page's HTTP <code>Last-Modified</code> header). However <code>lastModified</code> drifts every time the page is re-published.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">5.2</span> Automating Publishdate</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Approach</th><th>Automation Level</th><th>Accuracy</th><th>Effort</th></tr></thead>
+        <tbody>
+          <tr><td><code>lastModified</code> fallback (current)</td><td><span class="badge badge-yes">✅ Auto</span></td><td><span class="badge badge-warn">⚠️ Drifts on re-publish</span></td><td>Already done</td></tr>
+          <tr><td>Date from URL path <code>/articles/YYYY/MM/DD/slug</code></td><td><span class="badge badge-yes">✅ Fully auto</span></td><td><span class="badge badge-yes">✅ Stable</span></td><td>Low — URL convention + small code change</td></tr>
+          <tr><td>Admin API <code>firstModified</code></td><td><span class="badge badge-yes">✅ Fully auto</span></td><td><span class="badge badge-yes">✅ Most accurate</span></td><td>High — auth + per-page API call</td></tr>
+          <tr><td>Author-entered <code>Publishdate</code> (current)</td><td><span class="badge badge-no">❌ Manual</span></td><td><span class="badge badge-yes">✅ Correct</span></td><td>—</td></tr>
+        </tbody>
+      </table></div>
+      <p><strong>Best practical approach:</strong> adopt <code>/articles/YYYY/MM/DD/slug</code> URL convention and extract the date from the path in the generator:</p>
+<pre><code>function extractDateFromPath(rowPath) {
+  const match = rowPath.match(/\/articles\/(\d{4})\/(\d{2})\/(\d{2})\//);
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : null;
+}
+
+function resolvePubDate(row) {
+  if (row.publishdate) return toFeedDate(row.publishdate);        // explicit wins
+  const pathDate = extractDateFromPath(row.path);
+  if (pathDate) return toFeedDate(pathDate);                      // from URL
+  if (row.lastModified) return toFeedDate(row.lastModified * 1000); // fallback
+  return toFeedDate();
+}</code></pre>
+      <p>No changes to <code>helix-query.yaml</code> needed — <code>publishdate</code> remains as an optional override.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">5.3</span> Automating Template</div>
+      <ul class="option-list">
+        <li>
+          <div class="opt-label">Option A — Use folder path alone (zero author input)</div>
+          <p>Drop the template check: <code>return row.path.startsWith('/articles/');</code><br>Risk: non-article pages accidentally placed under <code>/articles/</code> would appear in the feed.</p>
+        </li>
+        <li>
+          <div class="opt-label">Option B — Infer from URL date pattern</div>
+          <p><code>return /^\/articles\/\d{4}\/\d{2}\/\d{2}\//.test(row.path);</code><br>Date-in-URL is the implicit "this is an article" signal — no author action needed.</p>
+        </li>
+        <li>
+          <div class="opt-label">Option C — Pre-fill via Document Authoring Template ✅ Recommended</div>
+          <p>In DA, pre-fill <code>Template: Article Template</code> in the Article template document. Authors get it automatically when creating a new article — they cannot forget or misspell it.</p>
+        </li>
+        <li>
+          <div class="opt-label">Option D — Replace template with a category field</div>
+          <p>Add <code>category: news</code> to <code>helix-query.yaml</code>'s <code>article-index</code> and filter on that instead — semantically richer, still pre-fillable in the authoring template.</p>
+        </li>
+      </ul>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">5.4</span> Recommended Combined Approach</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Goal</th><th>Recommended Change</th><th>Effort</th></tr></thead>
+        <tbody>
+          <tr><td>Eliminate manual <code>Publishdate</code></td><td>Adopt <code>/articles/YYYY/MM/DD/slug</code> URL convention + extract date from path in generator</td><td>Low</td></tr>
+          <tr><td>Eliminate manual <code>Template</code></td><td>Pre-fill <code>Template: Article Template</code> in the Article authoring template document</td><td>Minimal</td></tr>
+          <tr><td>Fully remove template dependency</td><td>Drop template check; rely on <code>/articles/</code> folder + date URL pattern</td><td>Low</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <!-- ── Section 6 ── -->
+  <div class="section" id="s6">
+    <div class="section-title"><span class="num">6</span> What Is the Body Selector Limitation of helix-shared-indexer (4.6.1)?</div>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">6.1</span> What Is It?</div>
+      <p>The <strong>body selector limitation</strong> is the fact that <strong>CSS selectors targeting the <code>&lt;main&gt;</code> body (or any element inside it) do not work in <code>helix-query.yaml</code> when the content source is AEM Sites (Universal Editor / BYOM)</strong>.</p>
+      <p>The version reference <strong>4.6.1</strong> corresponds to a known behaviour in <code>@adobe/helix-shared-indexer</code> — the package the EDS platform uses internally to evaluate <code>helix-query.yaml</code> index expressions. In that version, body-scoped selectors are silently skipped (returning an empty string) for AEM Sites-sourced content, even when the YAML syntax is correct.</p>
+      <div class="callout info">
+        <span class="callout-icon">ℹ️</span>
+        <div>This was documented during work on the sibling project <code>aig-aem-eds-poc</code> (AEM Sites content source). <code>docs/search.md</code> in this project explicitly records that observation and explains why it does <strong>not</strong> apply here.</div>
+      </div>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">6.2</span> Why Does It Happen?</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Content Source</th><th>How Pages Are Indexed</th><th>Body Selectors Work?</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Google Drive / SharePoint / DA (this project)</strong></td>
+            <td>Indexer fetches the page's rendered <code>.plain.html</code> from the EDS CDN and runs selectors against that HTML</td>
+            <td><span class="badge badge-yes">✅ Yes</span> — <code>main</code>, <code>main .video-feature a</code>, etc. all resolve correctly</td>
+          </tr>
+          <tr>
+            <td><strong>AEM Sites (Universal Editor / BYOM)</strong></td>
+            <td>Content is sourced via AEM's Page API; the indexer processes a metadata-only representation — no rendered body</td>
+            <td><span class="badge badge-no">❌ No</span> — <code>&lt;main&gt;</code> and body-level elements are absent from the indexable HAST tree</td>
+          </tr>
+        </tbody>
+      </table></div>
+      <p>The <code>@adobe/helix-shared-indexer</code> uses <code>hast-util-select</code> to evaluate selectors. The CSS syntax (<code>main .video-feature a</code>) is entirely valid — the problem is upstream: the HAST tree received for AEM Sites pages simply contains no <code>main</code> element to select from. No error is thrown; the column is silently empty.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">6.3</span> Concrete Symptoms on the Sibling Project</div>
+      <p>Three separate attempts all returned empty strings in <code>query-index.json</code>:</p>
+<pre><code># Attempt 1 — identical to what works in this repo
+bodyText:
+  select: main
+  value: words(textContent(el), 0, 300)
+
+# Attempt 2 — narrower selector
+bodyText:
+  select: main > div p
+  value: textContent(el)
+
+# Attempt 3 — selectFirst variant
+bodyText:
+  selectFirst: main p
+  value: textContent(el)</code></pre>
+      <p>The YAML syntax was never the problem — the same <code>words(textContent(el), 0, 300)</code> works correctly in this repo.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">6.4</span> Why This Project Is NOT Affected</div>
+      <p>This project uses DA/git as the content source. The indexer fetches <code>{path}.plain.html</code> from the EDS CDN — a full rendered page with a real <code>&lt;main&gt;</code> element. Living proof:</p>
+<pre><code># helix-query.yaml — these all produce populated columns here:
+bodyText:
+  select: main                         # full main content
+  value: words(textContent(el), 0, 300)
+
+videourl:
+  select: main .video-feature a        # body-scoped selector works
+  value: attribute(el, "href")
+
+videothumbnail:
+  select: main .video-feature img      # body-scoped selector works
+  value: attribute(el, "src")</code></pre>
+      <p><code>video-index.json</code> has populated <code>videourl</code> and <code>videothumbnail</code> columns for pages with a <code>video-feature</code> block — confirming body selectors work.</p>
+    </div>
+
+    <div class="subsection">
+      <div class="subsection-title"><span class="sub-num">6.5</span> Implications &amp; Workarounds</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Situation</th><th>Impact</th></tr></thead>
+        <tbody>
+          <tr><td>Project stays on DA/git content source</td><td><span class="badge badge-yes">✅ No limitation</span> — body selectors work</td></tr>
+          <tr><td>Project migrates to AEM Sites</td><td><span class="badge badge-warn">⚠️ Breaks silently</span> — <code>bodyText</code>, <code>videourl</code>, <code>videothumbnail</code> all go empty</td></tr>
+        </tbody>
+      </table></div>
+      <p>If AEM Sites content source is adopted, body-indexed fields require one of:</p>
+      <ol>
+        <li><strong>Store values in <code>&lt;head&gt;</code> metadata</strong> — surface body content as a meta tag via AEM page properties.</li>
+        <li><strong>Custom AEM servlet / GraphQL endpoint</strong> — query AEM's Lucene/Oak index server-side instead of <code>query-index.json</code>.</li>
+        <li><strong>AEP Data Collection</strong> — index page content via client-side collection at publish time, feeding Algolia or Elasticsearch.</li>
+        <li><strong>Hybrid approach</strong> — keep the metadata index for title/description/path; use a separate full-text index for body search. The <code>search-results</code> block already supports this pattern via <code>Promise.allSettled</code>.</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- ── Quick Reference ── -->
+  <div class="quick-ref" id="qr">
+    <h2>Quick Reference</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Question</th><th>Answer</th></tr></thead>
+      <tbody>
+        <tr><td>Is <code>/sitemap.xml</code> committed to Git?</td><td><span class="badge badge-no">❌ No</span> — platform-generated at runtime</td></tr>
+        <tr><td>Is <code>video-sitemap.xml</code> committed to Git?</td><td><span class="badge badge-yes">✅ Yes</span> — daily GitHub Action commits it</td></tr>
+        <tr><td>Is <code>article-really-simple-syndication.rss</code> committed to Git?</td><td><span class="badge badge-yes">✅ Yes</span> — daily GitHub Action commits it</td></tr>
+        <tr><td>Which branch do workflows target?</td><td><code>main</code> (hardcoded <code>ref: main</code>)</td></tr>
+        <tr><td>Does the branch match the site config?</td><td><span class="badge badge-yes">✅ Yes</span> — EDS URL, workflows, and generators all use <code>main</code></td></tr>
+        <tr><td>How is multi-tenancy achieved?</td><td>EDS <code>org+site+branch</code> URL isolation; one GitHub repo per tenant</td></tr>
+        <tr><td>Is there shared sitemap infrastructure across tenants?</td><td><span class="badge badge-no">❌ No</span> — fully isolated per repo/tenant</td></tr>
+        <tr><td>Can bot commits cause PR merge conflicts?</td><td><span class="badge badge-warn">⚠️ Yes</span> — daily direct push to <code>main</code>; use <code>.gitattributes</code> + rebase policy</td></tr>
+        <tr><td>Can Template/Publishdate be automated?</td><td><span class="badge badge-yes">✅ Yes</span> — date-from-URL path + authoring template pre-fill</td></tr>
+        <tr><td>Do body selectors work in this project?</td><td><span class="badge badge-yes">✅ Yes</span> — DA/git source; would break if migrated to AEM Sites</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+  <!-- ── Related Files ── -->
+  <div class="related-files" id="rf">
+    <h2>Related Files</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>helix-sitemap.yaml</code></td><td>Configures the platform-generated <code>/sitemap.xml</code></td></tr>
+        <tr><td><code>helix-query.yaml</code></td><td>Defines all query indices (<code>query-index</code>, <code>video-index</code>, <code>article-index</code>)</td></tr>
+        <tr><td><code>video-sitemap.xml</code></td><td>Committed video sitemap artifact (5 entries as of last run)</td></tr>
+        <tr><td><code>article-really-simple-syndication.rss</code></td><td>Committed RSS feed artifact</td></tr>
+        <tr><td><code>tools/generate-video-sitemap.js</code></td><td>Video sitemap generator script</td></tr>
+        <tr><td><code>tools/generate-article-rss.js</code></td><td>RSS feed generator script</td></tr>
+        <tr><td><code>.github/workflows/video-sitemap.yaml</code></td><td>Daily workflow: generate + commit <code>video-sitemap.xml</code></td></tr>
+        <tr><td><code>.github/workflows/article-rss.yaml</code></td><td>Daily workflow: generate + commit RSS feed</td></tr>
+      </tbody>
+    </table></div>
+  </div>
+
+</div><!-- /.page-wrapper -->
+</body>
+</html>
