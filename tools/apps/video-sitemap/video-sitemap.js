@@ -21,6 +21,10 @@ import { LitElement, html, nothing } from 'da-lit';
 // DA Admin API base — source/publish endpoints for writing content
 const DA_ADMIN = 'https://admin.da.live';
 
+// CORS proxy — same as publish-requests-inbox; wraps external origins that
+// do not allow the da.live iframe origin directly (e.g. *.aem.live index JSON).
+const CORS_PROXY = 'https://da-etc.adobeaem.workers.dev/cors';
+
 // daFetch ensures a fresh IMS token is used on every request (handles token expiry)
 const { daFetch } = await import('https://da.live/nx/utils/daFetch.js');
 
@@ -119,13 +123,16 @@ ${entries}
 
 /**
  * Fetch video-index.json from the live site.
+ * Routed through the DA CORS proxy so the request works from the da.live
+ * iframe origin (*.aem.live does not include da.live in its CORS allow-list).
  * @param {string} host - e.g. https://main--repo--org.aem.live
  * @returns {Promise<Array>} Array of rows with videourl set
  */
 async function fetchVideoIndex(host) {
-  const url = `${host}/video-index.json`;
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`Failed to fetch ${url}: ${resp.status} ${resp.statusText}`);
+  const indexUrl = `${host}/video-index.json`;
+  const proxiedUrl = `${CORS_PROXY}?url=${encodeURIComponent(indexUrl)}`;
+  const resp = await daFetch(proxiedUrl);
+  if (!resp.ok) throw new Error(`Failed to fetch ${indexUrl}: ${resp.status} ${resp.statusText}`);
   const { data } = await resp.json();
   return (data || []).filter((row) => row.videourl);
 }
