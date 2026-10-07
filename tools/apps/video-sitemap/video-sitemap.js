@@ -168,17 +168,19 @@ async function writeSitemapToDa(org, repo, xml) {
 }
 
 /**
- * Publish the video-sitemap.xml via DA Admin publish API.
- * POST https://admin.da.live/publish/{org}/{repo}/video-sitemap.xml
- * This makes the file live at https://{liveHost}/video-sitemap.xml
+ * Publish the video-sitemap.xml via the AEM Helix Admin live API.
+ * POST https://admin.hlx.page/live/{org}/{repo}/main/video-sitemap.xml
+ * Routed through the CORS proxy (same pattern as publishContent in
+ * publish-requests-inbox) so the da.live iframe origin is accepted.
  * @param {string} org
  * @param {string} repo
  * @returns {Promise<Object>} { success, error? }
  */
 async function publishSitemapInDa(org, repo) {
-  const url = `${DA_ADMIN}/publish/${org}/${repo}/video-sitemap.xml`;
+  const publishUrl = `https://admin.hlx.page/live/${org}/${repo}/main/video-sitemap.xml`;
+  const proxiedUrl = `${CORS_PROXY}?url=${encodeURIComponent(publishUrl)}`;
   try {
-    const resp = await daFetch(url, { method: 'POST' });
+    const resp = await daFetch(proxiedUrl, { method: 'POST' });
     if (!resp.ok) {
       const text = await resp.text().catch(() => '');
       return { success: false, error: `Publish failed (${resp.status}): ${text}` };
