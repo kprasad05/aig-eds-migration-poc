@@ -49,7 +49,7 @@ ${entries}
     const response = new Response(xml, {
       headers: {
         'content-type': 'application/xml; charset=utf-8',
-        'cache-control': 'public, max-age=3600',
+        'cache-control': 'public, max-age=30',
       },
     });
     ctx.waitUntil(cache.put(cacheKey, response.clone()));
