@@ -1,0 +1,95 @@
+.pre-quote {
+  display: grid;
+  gap: 32px;
+  color: #163249;
+}
+
+.pre-quote .pre-quote-hero h1 {
+  font-size: clamp(36px, 5vw, 60px);
+  line-height: 1.15;
+}
+
+.pre-quote .pre-quote-eyebrow {
+  color: #006b59;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.pre-quote .pre-quote-intro {
+  font-size: 20px;
+}
+
+.pre-quote .pre-quote-panel {
+  padding: 28px;
+  border: 1px solid #dbe3e9;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.pre-quote form {
+  display: grid;
+  gap: 10px;
+}
+
+.pre-quote label {
+  font-weight: 700;
+}
+
+.pre-quote input,
+.pre-quote select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 48px;
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid #aebdcc;
+  border-radius: 6px;
+  background: #fff;
+  color: #163249;
+  font: inherit;
+}
+
+.pre-quote button {
+  width: 100%;
+  min-height: 48px;
+  margin: 10px 0;
+  border-radius: 8px;
+  background: #006b59;
+  color: #fff;
+}
+
+.pre-quote button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.pre-quote :is(input, select, button):focus-visible {
+  outline: 3px solid #336dd9;
+  outline-offset: 3px;
+}
+
+.pre-quote .pre-quote-note {
+  color: #607184;
+  font-size: 14px;
+}
+
+.pre-quote .journey-error {
+  padding: 16px;
+  border: 1px solid #db9c9c;
+  border-radius: 8px;
+  background: #fff1f1;
+  color: #8a2020;
+}
+
+@media (width >= 900px) {
+  .pre-quote {
+    grid-template-columns: 1.2fr 1fr;
+    align-items: center;
+    gap: 60px;
+  }
+
+  .pre-quote .journey-error {
+    grid-column: 1 / -1;
+  }
+}
