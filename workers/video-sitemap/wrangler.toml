@@ -1,0 +1,11 @@
+name = "aig-video-sitemap"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+routes = [
+  { pattern = "purushtest.online/video-sitemap.xml", zone_name = "purushtest.online" },
+]
+
+[vars]
+ORIGIN = "https://main--aig-eds-migration-poc--kprasad05.aem.live"
+SITE_HOST = "https://purushtest.online"
