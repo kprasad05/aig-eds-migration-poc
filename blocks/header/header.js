@@ -318,6 +318,12 @@ function buildSearchOverlay() {
  * @param {Element} block The header block element
  */
 export default async function decorate(block) {
+  const noNav = /^(true|yes|1)$/i.test((getMetadata('no-nav') || '').trim());
+  if (noNav) {
+    block.closest('header')?.remove();
+    return;
+  }
+
   const navMeta = getMetadata('nav');
   const navPath = navMeta ? new URL(navMeta, window.location).pathname : '/nav';
   const fragment = await loadFragment(navPath);
@@ -344,13 +350,8 @@ export default async function decorate(block) {
     if (brandLink) brandLink.classList.add('nav-logo');
   }
 
-  // Hide nav-sections when page metadata sets no-nav: true
-  const noNav = /^(true|yes|1)$/i.test((getMetadata('no-nav') || '').trim());
   const navSections = nav.querySelector('.nav-sections');
-  if (navSections && noNav) {
-    navSections.remove();
-    nav.classList.add('no-nav-sections');
-  } else if (navSections) {
+  if (navSections) {
     const topList = navSections.querySelector('ul');
     if (topList) topList.classList.add('nav-list');
     navSections.querySelectorAll(':scope ul > li').forEach((li) => {

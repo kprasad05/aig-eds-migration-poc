@@ -6,6 +6,12 @@ import { loadFragment } from '../fragment/fragment.js';
  * @param {Element} block The footer block element
  */
 export default async function decorate(block) {
+  const noNav = /^(true|yes|1)$/i.test((getMetadata('no-nav') || '').trim());
+  if (noNav) {
+    block.closest('footer')?.remove();
+    return;
+  }
+
   const footerMeta = getMetadata('footer');
   const footerPath = footerMeta ? new URL(footerMeta, window.location).pathname : '/footer';
   const fragment = await loadFragment(footerPath);
