@@ -37,7 +37,7 @@ export default {
     if (!res.ok) return new Response('video-index unavailable', { status: 502 });
     const { data } = await res.json();
 
-    const host = env.SITE_HOST || env.ORIGIN;
+    const host = env.ORIGIN;
     const entries = data.filter((r) => r.videourl).map((r) => buildEntry(r, host)).join('\n');
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
