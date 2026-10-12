@@ -1,0 +1,27 @@
+{
+  "section": {
+    "label": "Section",
+    "options": [
+      { "label": "Light", "value": "light" },
+      { "label": "Highlight", "value": "highlight" },
+      { "label": "Pale blue", "value": "paleblue" },
+      { "label": "Dark", "value": "dark" }
+    ]
+  },
+  "page": {
+    "label": "Page metadata",
+    "options": [
+      { "label": "Hide main navigation (no-nav)", "value": "no-nav" },
+      { "label": "Hide from nav menus (hidenav)", "value": "hidenav" }
+    ]
+  },
+  "blocks": [
+    {
+      "label": "Hero Banner",
+      "name": "Hero Banner",
+      "options": [
+        { "label": "No image", "value": "no-image" }
+      ]
+    }
+  ]
+}

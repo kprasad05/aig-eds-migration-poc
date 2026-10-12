@@ -1,0 +1,33 @@
+body {
+  margin: 0;
+  padding: 16px;
+  font-family: system-ui, sans-serif;
+  font-size: 14px;
+}
+
+.style-picker label {
+  display: block;
+  margin: 8px 0;
+}
+
+.style-picker select {
+  width: 100%;
+  padding: 6px;
+}
+
+.style-picker fieldset {
+  margin: 12px 0;
+  padding: 8px 12px;
+}
+
+.style-picker .preview {
+  margin: 12px 0;
+  padding: 8px;
+  background: #f3f3f3;
+  font-family: monospace;
+}
+
+.style-picker button {
+  padding: 8px 16px;
+  cursor: pointer;
+}
