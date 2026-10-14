@@ -436,7 +436,7 @@ test('project loading preserves readable titles and reports partial failures', a
         title: 'Completed French',
         urls: [{ basePath: '/home' }],
         langs: [{
-          name: 'French', action: 'translate', location: '/fr',
+          name: 'French', action: 'translate', location: '/fr/ca',
           translation: { status: 'complete', saved: 1 },
         }],
       };
@@ -448,10 +448,45 @@ test('project loading preserves readable titles and reports partial failures', a
   assert.equal(app._projects[1].available, false);
   assert.equal(toasts[0].variant, 'warning');
   await app.handleProjectSelect('/project/a');
-  assert.equal(app._generatedPaths[0], '/fr/home');
+  assert.equal(app._generatedPaths[0], '/fr/ca/home');
   app.handleDestinationChange(app._destinations[0].id, false);
   assert.equal(app._generatedPaths.length, 0);
   assert.equal(app._loadingProjects, false);
+});
+
+test('translation project selection offers completed country rollouts but not language masters', async () => {
+  const project = {
+    title: 'us-fragment-update',
+    urls: [{ basePath: '/fragments/fragment-test', suppliedPath: '/en/us/fragments/fragment-test', checked: true }],
+    langs: [
+      {
+        name: 'English', action: 'rollout', location: '/en/us',
+        rollout: { status: 'complete', saved: 1 },
+        locales: [{ code: '/en/ca', active: true, saved: 1 }],
+      },
+      {
+        name: 'French', action: 'translate', location: '/fr',
+        translation: { status: 'complete', saved: 1 },
+        rollout: { status: 'complete', saved: 1 },
+        locales: [{ code: '/fr/ca', active: true, saved: 1 }],
+      },
+    ],
+  };
+  const { app } = await createApp({
+    listTranslationProjects: async () => [{ path: '/project/test', name: 'test' }],
+    loadTranslationProject: async () => project,
+  });
+  await app.handleFlowChange('translations');
+  assert.equal(app._projects[0].available, true);
+  await app.handleProjectSelect('/project/test');
+  assert.deepEqual(Array.from(app._generatedPaths), [
+    '/en/ca/fragments/fragment-test', '/fr/ca/fragments/fragment-test',
+  ]);
+  project.langs = [project.langs[1]];
+  project.langs[0].rollout.status = 'not started';
+  await app.handleLoadProjects();
+  assert.equal(app._projects[0].available, false);
+  assert.match(app._projects[0].reason, /language\/country/);
 });
 
 test('changing site clears project selection and validation results', async () => {
@@ -475,7 +510,7 @@ function completedProject(title) {
     title,
     urls: [{ basePath: '/home' }],
     langs: [{
-      name: 'French', action: 'translate', location: '/fr',
+      name: 'French', action: 'translate', location: '/fr/ca',
       translation: { status: 'complete', saved: 1 },
     }],
   };

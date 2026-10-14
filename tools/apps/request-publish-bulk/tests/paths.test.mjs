@@ -46,9 +46,9 @@ test('rejects unsafe or non-content paths and malformed site values', () => {
   assert.doesNotThrow(() => validateSite('org', 'site-name'));
 });
 
-test('builds translation and rollout paths without doubling language prefixes', () => {
+test('builds country rollout paths and excludes intermediate language-only translations', () => {
   assert.deepEqual(getTranslationDestinations(project()).map((destination) => destination.paths), [
-    ['/en/ca/fragments/test'], ['/fr/fragments/test'], ['/fr/ca/fragments/test'],
+    ['/en/ca/fragments/test'], ['/fr/ca/fragments/test'],
   ]);
 });
 
@@ -77,13 +77,40 @@ test('does not infer saved translation or rollout from translated status alone',
   assert.deepEqual(getTranslationDestinations(data), []);
 });
 
-test('includes a completed translation even when rollout is not yet complete', () => {
+test('includes a completed language/country translation even when rollout is not yet complete', () => {
+  const data = project();
+  data.langs = [data.langs[1]];
+  data.langs[0].location = '/fr/ca';
+  data.langs[0].rollout.status = 'not started';
+  assert.deepEqual(getTranslationDestinations(data).map((destination) => destination.paths), [
+    ['/fr/ca/fragments/test'],
+  ]);
+});
+
+test('never substitutes a language-only translation for incomplete country rollouts', () => {
   const data = project();
   data.langs = [data.langs[1]];
   data.langs[0].rollout.status = 'not started';
-  assert.deepEqual(getTranslationDestinations(data).map((destination) => destination.paths), [
-    ['/fr/fragments/test'],
-  ]);
+  assert.deepEqual(getTranslationDestinations(data), []);
+  data.langs[0].rollout.status = 'complete';
+  data.langs[0].locales[0].saved = 0;
+  assert.deepEqual(getTranslationDestinations(data), []);
+  data.langs[0].locales[0].saved = 1;
+  data.langs[0].locales[0].active = false;
+  assert.deepEqual(getTranslationDestinations(data), []);
+});
+
+test('only offers two-segment destination folders for translations, copies, and rollouts', () => {
+  for (const location of ['/fr', '/de', '/fr/ca/nested']) {
+    const data = project({
+      langs: [{
+        name: 'French', action: 'copy', location, copy: { status: 'complete', saved: 1 },
+        rollout: { status: 'complete', saved: 1 },
+        locales: [{ code: location, active: true, saved: 1 }],
+      }],
+    });
+    assert.deepEqual(getTranslationDestinations(data), [], location);
+  }
 });
 
 test('excludes unchecked sources, inactive locales, and incomplete saved counts', () => {
@@ -97,9 +124,9 @@ test('excludes unchecked sources, inactive locales, and incomplete saved counts'
 
 test('handles copy destinations and optional locale lists', () => {
   const data = project({
-    langs: [{ name: 'French', action: 'copy', location: '/fr', copy: { status: 'complete', saved: 1 } }],
+    langs: [{ name: 'French', action: 'copy', location: '/fr/ca/', copy: { status: 'complete', saved: 1 } }],
   });
-  assert.deepEqual(getTranslationDestinations(data)[0].paths, ['/fr/fragments/test']);
+  assert.deepEqual(getTranslationDestinations(data)[0].paths, ['/fr/ca/fragments/test']);
 });
 
 test('rejects unsupported or malformed projects instead of inventing paths', () => {

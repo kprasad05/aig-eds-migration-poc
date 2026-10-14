@@ -52,6 +52,15 @@ the project's source-language folder. A language's `location` is its
 translation/copy destination; `locale.code` is a separate rollout destination,
 not a suffix to append to the language folder.
 
+The translation flow only offers destination folders matching `/<lang>/<country>`.
+Language-only folders such as `/fr` are intermediate translation content, not
+publish destinations. For example, a completed translation in `/fr` with a
+completed rollout to `/fr/ca` offers `/fr/ca/fragments/fragment-test`, never
+`/fr/fragments/fragment-test`. A completed translation or copy directly into
+a language/country folder is still eligible without a rollout. The app does not
+invent a country or offer locales before their rollout is complete. This rule
+does not restrict manually pasted paths.
+
 Only completed translation/copy destinations and completed active locale
 rollouts are selectable. Saved counts, when supplied, must cover all selected
 source URLs. A translated language does not imply its locale rollout completed.
