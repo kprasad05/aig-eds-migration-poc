@@ -39,7 +39,8 @@ function joinDestination(location, basePath) {
 
 /**
  * A language's location is its translation destination; locale.code is a
- * separate rollout destination. Never append a locale to the language folder.
+ * separate rollout destination. Only language/country folders are publishable;
+ * language-only translation folders are intermediate content.
  */
 export function getTranslationDestinations(project) {
   if (!Array.isArray(project.urls) || !Array.isArray(project.langs)) {
@@ -72,6 +73,7 @@ export function getTranslationDestinations(project) {
     if (paths.some((path) => !isValidPath(path))) {
       throw new Error(`Invalid generated path for ${label}. Check the translation project.`);
     }
+    if (!/^\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/?$/.test(location)) return;
     destinations.push({
       id: `${label}:${location}`, location, label, paths,
     });

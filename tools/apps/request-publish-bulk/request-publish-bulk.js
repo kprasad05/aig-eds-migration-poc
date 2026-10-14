@@ -271,7 +271,7 @@ class RequestPublishBulkApp extends LitElement {
           this._org.trim(), this._site.trim(), entry.path, this.token,
         );
         let available = false;
-        let reason = 'No completed translation or rollout destinations';
+        let reason = 'No completed language/country destinations';
         if (Array.isArray(project.langs) && Array.isArray(project.urls)) {
           try {
             available = getTranslationDestinations(project).length > 0;
@@ -296,7 +296,7 @@ class RequestPublishBulkApp extends LitElement {
     } else if (!this._projectEntries.length) {
       this._notify('info', 'No active translation projects were found for this site.');
     } else if (!projects.some((project) => project.available)) {
-      this._notify('info', 'No completed destinations on this page. Browse another page for more active projects.');
+      this._notify('info', 'No completed language/country destinations on this page. Browse another page for more active projects.');
     }
   }
 
@@ -314,7 +314,7 @@ class RequestPublishBulkApp extends LitElement {
       this._destinations = getTranslationDestinations(this._project);
       this._selectedDestinations = new Set(this._destinations.map((destination) => destination.id));
       if (!this._destinations.length) {
-        this._notify('warning', 'This project no longer has completed destinations. Refresh the project list.');
+        this._notify('warning', 'This project has no completed language/country destinations. Language-only folders are excluded. Refresh the project list.');
       }
     } catch (error) {
       this._clearProject();
@@ -654,7 +654,7 @@ class RequestPublishBulkApp extends LitElement {
       && selectedCount === this._destinations.length;
     return html`
       <section aria-label="Translation project" class="translation-panel">
-        <p class="field-hint">Choose an active project. Only completed translation, copy, and rollout destinations can be requested for publication.</p>
+        <p class="field-hint">Choose an active project. Only completed translation, copy, and rollout destinations matching /&lt;lang&gt;/&lt;country&gt; can be requested for publication. Language-only folders are excluded.</p>
         <sl-button ?disabled=${this._busy} @click=${() => this.handleLoadProjects()}>
           Refresh projects
         </sl-button>
