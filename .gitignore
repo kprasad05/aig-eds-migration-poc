@@ -18,3 +18,5 @@ helix-importer-ui
 migration-work/navigation-validation/
 migration-work/footer-validation/
 .wrangler/
+
+.history/

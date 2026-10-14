@@ -17,15 +17,24 @@
 /* eslint-disable class-methods-use-this, function-paren-newline */
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { LitElement, html, nothing } from 'da-lit';
+import { showToast, VARIANT_ERROR, VARIANT_WARNING } from 'https://da.live/nx2/blocks/shared/toast/toast.js';
 import {
   listMyPendingRequests,
+  listPendingRequests,
   previewContent,
   submitPublishRequest,
   getUserEmail,
+  listTranslationProjects,
+  loadTranslationProject,
+  validateContent,
 } from './api.js';
+import {
+  normalizePath, isValidPath, validateSite, getTranslationDestinations,
+} from './paths.js';
 
 const NX = 'https://da.live/nx2';
 const CONCURRENCY = 3;
+const PROJECT_PAGE_SIZE = 3;
 let nexter = null;
 let sl = null;
 let styles = null;
@@ -57,28 +66,27 @@ const STATUS_LABELS = {
   submitting: 'Submitting...',
   submitted: 'Submitted',
   failed: 'Failed',
+  checking: 'Checking...',
+  missing: 'Page not found',
+  stale: 'Preview out of date',
+  'needs-preview': 'Not previewed',
+  unverified: 'Freshness unknown',
+  error: 'Validation failed',
 };
 
-/**
- * Normalize a pasted line to a site-relative content path.
- * @returns {string|null} Normalized path, or null if the line is unusable
- */
-export function normalizePath(line) {
-  let p = line.trim();
-  if (!p) return null;
-  try {
-    if (/^https?:\/\//i.test(p)) p = new URL(p).pathname;
-  } catch {
-    return p;
-  }
-  p = p.split(/[?#]/)[0].replace(/\.(plain\.)?html$/i, '').replace(/\/{2,}/g, '/');
-  if (!p.startsWith('/')) p = `/${p}`;
-  if (p.length > 1) p = p.replace(/\/$/, '');
-  return p;
+async function forEachLimited(items, callback, concurrency = CONCURRENCY) {
+  const queue = [...items];
+  await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+    while (queue.length) {
+      // eslint-disable-next-line no-await-in-loop
+      await callback(queue.shift());
+    }
+  }));
 }
 
-function isValidPath(path) {
-  return /^\/[A-Za-z0-9\-_./]*$/.test(path) && !path.split('/').includes('..') && path !== '/';
+function formatDate(value) {
+  const date = new Date(value);
+  return value && Number.isFinite(date.getTime()) ? date.toLocaleString() : 'Unavailable';
 }
 
 class RequestPublishBulkApp extends LitElement {
@@ -95,6 +103,16 @@ class RequestPublishBulkApp extends LitElement {
     _validating: { state: true },
     _submitting: { state: true },
     _userEmail: { state: true },
+    _flow: { state: true },
+    _projects: { state: true },
+    _projectEntries: { state: true },
+    _projectPage: { state: true },
+    _loadingProjects: { state: true },
+    _projectPath: { state: true },
+    _project: { state: true },
+    _destinations: { state: true },
+    _selectedDestinations: { state: true },
+    _selectedPreviewPaths: { state: true },
   };
 
   constructor() {
@@ -109,6 +127,16 @@ class RequestPublishBulkApp extends LitElement {
     this._validating = false;
     this._submitting = false;
     this._userEmail = '';
+    this._flow = 'paths';
+    this._projects = [];
+    this._projectEntries = [];
+    this._projectPage = 0;
+    this._loadingProjects = false;
+    this._projectPath = '';
+    this._project = null;
+    this._destinations = [];
+    this._selectedDestinations = new Set();
+    this._selectedPreviewPaths = new Set();
   }
 
   connectedCallback() {
@@ -132,32 +160,224 @@ class RequestPublishBulkApp extends LitElement {
     return this._items.filter((i) => i.status === 'failed');
   }
 
+  get _busy() {
+    return this._validating || this._submitting || this._loadingProjects;
+  }
+
+  get _previewable() {
+    return this._items.filter((item) => ['stale', 'needs-preview', 'unverified', 'already-pending'].includes(item.status)
+      && ['stale', 'needs-preview', 'unverified'].includes(item.validationStatus || item.status));
+  }
+
+  get _selectedPreviewItems() {
+    return this._previewable.filter((item) => this._selectedPreviewPaths.has(item.path));
+  }
+
+  get _generatedPaths() {
+    return [...new Set(this._destinations
+      .filter((destination) => this._selectedDestinations.has(destination.id))
+      .flatMap((destination) => destination.paths))];
+  }
+
+  get _projectPageCount() {
+    return Math.ceil(this._projectEntries.length / PROJECT_PAGE_SIZE);
+  }
+
+  _notify(type, text) {
+    this._message = { type, text };
+    if (type === 'error' || type === 'warning') {
+      console[type === 'error' ? 'error' : 'warn']('[Request Publish Bulk]', text);
+      showToast({ text, variant: type === 'error' ? VARIANT_ERROR : VARIANT_WARNING });
+    }
+  }
+
+  _checkSite() {
+    try {
+      validateSite(this._org.trim(), this._site.trim());
+      return true;
+    } catch (error) {
+      this._notify('error', error.message);
+      return false;
+    }
+  }
+
+  handleSiteChange(field, value) {
+    this[field] = value;
+    this._projects = [];
+    this._projectEntries = [];
+    this._projectPage = 0;
+    this._clearProject();
+    this._resetValidation();
+  }
+
+  _clearProject() {
+    this._projectPath = '';
+    this._project = null;
+    this._destinations = [];
+    this._selectedDestinations = new Set();
+  }
+
+  async handleFlowChange(flow) {
+    if (this._busy || this._flow === flow) return;
+    this._flow = flow;
+    this._resetValidation();
+    if (flow === 'translations' && !this._projectEntries.length) await this.handleLoadProjects();
+  }
+
+  async handleLoadProjects() {
+    if (this._busy || !this._checkSite()) return;
+    this._resetValidation();
+    this._clearProject();
+    this._projects = [];
+    this._projectEntries = [];
+    this._projectPage = 0;
+    this._loadingProjects = true;
+    const org = this._org.trim();
+    const site = this._site.trim();
+    try {
+      this._projectEntries = await listTranslationProjects(org, site, this.token);
+      await this._loadProjectPage(0);
+    } catch (error) {
+      this._notify('error', error.message);
+    } finally {
+      this._loadingProjects = false;
+    }
+  }
+
+  async handleProjectPage(page) {
+    if (this._busy || !Number.isInteger(page) || page < 0 || page >= this._projectPageCount) return;
+    this._resetValidation();
+    this._clearProject();
+    this._loadingProjects = true;
+    try {
+      await this._loadProjectPage(page);
+    } catch (error) {
+      this._notify('error', error.message);
+    } finally {
+      this._loadingProjects = false;
+    }
+  }
+
+  async _loadProjectPage(page) {
+    this._projectPage = page;
+    this._projects = [];
+    const start = page * PROJECT_PAGE_SIZE;
+    const entries = this._projectEntries.slice(start, start + PROJECT_PAGE_SIZE);
+    const projects = new Array(entries.length);
+    const indexedEntries = entries.map((entry, index) => ({ entry, index }));
+    await forEachLimited(indexedEntries, async ({ entry, index }) => {
+      try {
+        const project = await loadTranslationProject(
+          this._org.trim(), this._site.trim(), entry.path, this.token,
+        );
+        let available = false;
+        let reason = 'No completed translation or rollout destinations';
+        if (Array.isArray(project.langs) && Array.isArray(project.urls)) {
+          try {
+            available = getTranslationDestinations(project).length > 0;
+          } catch (error) {
+            reason = error.message;
+          }
+        }
+        projects[index] = {
+          ...entry, title: project.title, available, reason,
+        };
+      } catch (error) {
+        console.error('[Request Publish Bulk] Project load failed', { path: entry.path, message: error.message });
+        projects[index] = {
+          ...entry, title: entry.name, available: false, error: error.message,
+        };
+      }
+    });
+    this._projects = projects;
+    const failed = projects.filter((project) => project.error).length;
+    if (failed) {
+      this._notify('warning', `${failed} project file(s) on this page could not be read. Other projects remain available. Reload this page to retry.`);
+    } else if (!this._projectEntries.length) {
+      this._notify('info', 'No active translation projects were found for this site.');
+    } else if (!projects.some((project) => project.available)) {
+      this._notify('info', 'No completed destinations on this page. Browse another page for more active projects.');
+    }
+  }
+
+  async handleProjectSelect(path) {
+    if (this._busy) return;
+    this._resetValidation();
+    this._clearProject();
+    if (!path) return;
+    this._projectPath = path;
+    this._loadingProjects = true;
+    try {
+      this._project = await loadTranslationProject(
+        this._org.trim(), this._site.trim(), path, this.token,
+      );
+      this._destinations = getTranslationDestinations(this._project);
+      this._selectedDestinations = new Set(this._destinations.map((destination) => destination.id));
+      if (!this._destinations.length) {
+        this._notify('warning', 'This project no longer has completed destinations. Refresh the project list.');
+      }
+    } catch (error) {
+      this._clearProject();
+      this._notify('error', error.message);
+    } finally {
+      this._loadingProjects = false;
+    }
+  }
+
+  handleDestinationChange(id, checked) {
+    if (this._busy) return;
+    const selected = new Set(this._selectedDestinations);
+    if (checked) selected.add(id);
+    else selected.delete(id);
+    this._selectedDestinations = selected;
+    this._resetValidation();
+  }
+
+  handleSelectDestinations(selected) {
+    if (this._busy) return;
+    this._selectedDestinations = new Set(
+      selected ? this._destinations.map((destination) => destination.id) : [],
+    );
+    this._resetValidation();
+  }
+
   _updateItem(path, patch) {
     this._items = this._items.map((i) => (i.path === path ? { ...i, ...patch } : i));
+  }
+
+  handlePreviewSelection(path, checked) {
+    if (this._busy || !this._previewable.some((item) => item.path === path)) return;
+    const selected = new Set(this._selectedPreviewPaths);
+    if (checked) selected.add(path);
+    else selected.delete(path);
+    this._selectedPreviewPaths = selected;
+  }
+
+  handleSelectPreviews(checked) {
+    if (this._busy) return;
+    this._selectedPreviewPaths = new Set(checked ? this._previewable.map((item) => item.path) : []);
   }
 
   _resetValidation() {
     if (this._submitting) return;
     this._items = [];
+    this._selectedPreviewPaths = new Set();
     this._duplicates = 0;
     this._message = null;
   }
 
   async handleValidate() {
-    if (this._validating || this._submitting) return;
+    if (this._busy || !this._checkSite()) return;
     this._message = null;
+    this._selectedPreviewPaths = new Set();
 
     const org = this._org.trim();
     const site = this._site.trim();
-    if (!org || !site) {
-      this._message = { type: 'error', text: 'Enter the organization and site.' };
-      return;
-    }
-
     const seen = new Set();
     const items = [];
     let duplicates = 0;
-    this._pathsText.split(/\r?\n/).forEach((line) => {
+    const lines = this._flow === 'translations' ? this._generatedPaths : this._pathsText.split(/\r?\n/);
+    lines.forEach((line) => {
       const path = normalizePath(line);
       if (!path) return;
       if (seen.has(path)) {
@@ -165,42 +385,104 @@ class RequestPublishBulkApp extends LitElement {
         return;
       }
       seen.add(path);
-      items.push({ path, status: isValidPath(path) ? 'ready' : 'invalid', message: '' });
+      items.push({ path, status: isValidPath(path) ? 'checking' : 'invalid', message: '' });
     });
 
     if (items.length === 0) {
       this._items = [];
-      this._message = { type: 'error', text: 'Paste at least one page path.' };
+      this._notify('error', this._flow === 'translations'
+        ? 'Select a project and at least one completed destination folder.'
+        : 'Paste at least one page path.');
       return;
     }
 
     this._validating = true;
-    const pending = await listMyPendingRequests(org, site, this.token);
-    this._validating = false;
-
-    if (!pending.success) {
-      this._items = [];
-      this._message = { type: 'error', text: pending.error };
-      return;
-    }
-
-    const pendingPaths = new Set(pending.requests.map((r) => r.path));
     this._duplicates = duplicates;
-    this._items = items.map((i) => (i.status === 'ready' && pendingPaths.has(i.path)
-      ? { ...i, status: 'already-pending', message: 'You already have a pending request for this page.' }
-      : i));
+    this._items = items;
+    try {
+      const pending = await listPendingRequests(org, site, this.token);
+      if (!pending.success) throw new Error(pending.error);
+      const pendingPaths = new Set(pending.requests.map((request) => request.path));
+      await forEachLimited(items.filter((item) => item.status === 'checking'), async (item) => {
+        await this._validateItem({ ...item, pending: pendingPaths.has(item.path) });
+      });
+      const blocked = this._items.filter((item) => (item.validationStatus || item.status) !== 'ready').length;
+      if (blocked) this._notify('warning', `${blocked} page(s) need attention. Review the per-page results before submitting.`);
+      else this._notify('success', `${this._submittable.length} page(s) have a current preview and are ready to submit.`);
+    } catch (error) {
+      this._items = [];
+      this._notify('error', error.message);
+    } finally {
+      this._validating = false;
+    }
+  }
+
+  async _validateItem(item) {
+    let result;
+    try {
+      result = await validateContent(
+        this._org.trim(), this._site.trim(), item.path, this.token,
+      );
+    } catch (error) {
+      console.error('[Request Publish Bulk] Validation failed', { path: item.path, message: error.message });
+      result = { status: 'error', message: error.message };
+    }
+    const pending = item.pending || item.status === 'already-pending';
+    const pendingMessage = {
+      stale: 'The source changed after the preview. Refresh the preview before approval.',
+      'needs-preview': 'No preview exists. Preview this page before approval.',
+      unverified: 'Source timestamps are unavailable. Preview freshness cannot be confirmed for approval.',
+    }[result.status] || result.message || '';
+    this._updateItem(item.path, {
+      ...result,
+      pending,
+      validationStatus: result.status,
+      status: pending ? 'already-pending' : result.status,
+      message: pending
+        ? `A publish request is already pending for this page in your requests or approver inbox. ${pendingMessage}`.trim()
+        : result.message,
+    });
+    return !pending && result.status === 'ready';
+  }
+
+  async handlePreview(items) {
+    if (this._busy || !items.length) return;
+    this._validating = true;
+    this._message = null;
+    try {
+      await forEachLimited(items, async (item) => {
+        this._updateItem(item.path, { status: 'previewing', message: '' });
+        const result = await previewContent(this._org.trim(), this._site.trim(), item.path);
+        if (!result.success) {
+          this._updateItem(item.path, {
+            status: item.pending ? 'already-pending' : 'error',
+            validationStatus: 'error',
+            message: item.pending ? `The publish request is still pending. ${result.error}` : result.error,
+          });
+        } else {
+          await this._validateItem(item);
+        }
+      });
+      const blocked = items.filter((item) => {
+        const current = this._items.find((row) => row.path === item.path);
+        return (current?.validationStatus || current?.status) !== 'ready';
+      }).length;
+      if (blocked) this._notify('error', `${blocked} preview(s) could not be confirmed current. Review the page results and validate again.`);
+      else this._notify('success', 'Previews refreshed and source timestamps verified.');
+    } catch (error) {
+      this._notify('error', error.message);
+    } finally {
+      this._selectedPreviewPaths = new Set(this._selectedPreviewItems.map((item) => item.path));
+      this._validating = false;
+    }
   }
 
   async _processItem(item, comment) {
     const org = this._org.trim();
     const site = this._site.trim();
 
-    this._updateItem(item.path, { status: 'previewing', message: '' });
-    const preview = await previewContent(org, site, item.path);
-    if (!preview.success) {
-      this._updateItem(item.path, { status: 'failed', message: preview.error, ambiguous: false });
-      return;
-    }
+    this._updateItem(item.path, { status: 'checking', message: '' });
+    if (!await this._validateItem(item)) return;
 
     this._updateItem(item.path, { status: 'submitting' });
     const result = await submitPublishRequest({
@@ -209,6 +491,7 @@ class RequestPublishBulkApp extends LitElement {
     if (result.success) {
       this._updateItem(item.path, { status: 'submitted', message: 'Sent to approvers.', ambiguous: false });
     } else {
+      console.error('[Request Publish Bulk] Submission failed', { path: item.path, message: result.message });
       this._updateItem(item.path, {
         status: 'failed',
         message: result.message,
@@ -219,27 +502,35 @@ class RequestPublishBulkApp extends LitElement {
 
   async _run(targets) {
     const comment = this._comment.trim();
-    const queue = [...targets];
-    const worker = async () => {
-      while (queue.length) {
-        // eslint-disable-next-line no-await-in-loop
-        await this._processItem(queue.shift(), comment);
+    const pending = await listPendingRequests(this._org.trim(), this._site.trim(), this.token);
+    if (!pending.success) throw new Error(`Submission stopped: ${pending.error}`);
+    const pendingPaths = new Set(pending.requests.map((request) => request.path));
+    // The Worker writes a shared requests sheet; do not race concurrent submissions.
+    await forEachLimited(targets, async (item) => {
+      if (pendingPaths.has(item.path)) {
+        await this._validateItem({ ...item, pending: true });
+      } else {
+        await this._processItem(item, comment);
       }
-    };
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker));
+    }, 1);
   }
 
   async handleSubmit() {
-    if (this._submitting || this._submittable.length === 0) return;
+    if (this._busy || this._submittable.length === 0) return;
     this._submitting = true;
     this._message = null;
-    await this._run(this._submittable);
-    this._submitting = false;
-    this._summarize();
+    try {
+      await this._run(this._submittable);
+      this._summarize();
+    } catch (error) {
+      this._notify('error', error.message);
+    } finally {
+      this._submitting = false;
+    }
   }
 
   async handleRetry() {
-    if (this._submitting || this._failed.length === 0) return;
+    if (this._busy || this._failed.length === 0) return;
     this._submitting = true;
     this._message = null;
 
@@ -260,23 +551,30 @@ class RequestPublishBulkApp extends LitElement {
         toRetry = this._failed;
       } else {
         this._submitting = false;
-        this._message = { type: 'error', text: `Retry stopped: ${pending.error} Checking the queue first avoids duplicate requests.` };
+        this._notify('error', `Retry stopped: ${pending.error} Checking the queue first avoids duplicate requests.`);
         return;
       }
     }
 
-    await this._run(toRetry);
-    this._submitting = false;
-    this._summarize();
+    try {
+      await this._run(toRetry);
+      this._summarize();
+    } catch (error) {
+      this._notify('error', error.message);
+    } finally {
+      this._submitting = false;
+    }
   }
 
   _summarize() {
     const submitted = this._items.filter((i) => i.status === 'submitted').length;
     const failed = this._failed.length;
-    if (failed) {
-      this._message = { type: 'warning', text: `${submitted} submitted, ${failed} failed. Retry failed items below.` };
+    const blocked = this._items.filter((item) => !['submitted', 'already-pending', 'ready'].includes(item.status)
+      || (item.status === 'already-pending' && item.validationStatus !== 'ready')).length;
+    if (blocked) {
+      this._notify('warning', `${submitted} submitted, ${failed} submission(s) failed, ${blocked - failed} other page(s) need attention. Already-pending requests were skipped. Check pending requests before retrying notification failures.`);
     } else {
-      this._message = { type: 'success', text: `${submitted} request${submitted === 1 ? '' : 's'} sent to approvers.` };
+      this._notify('success', `${submitted} request${submitted === 1 ? '' : 's'} submitted. Already-pending requests were skipped.`);
     }
   }
 
@@ -286,6 +584,10 @@ class RequestPublishBulkApp extends LitElement {
 
   renderItems() {
     if (!this._validated) return nothing;
+    const previewable = this._previewable;
+    const selectedCount = this._selectedPreviewItems.length;
+    const allSelected = previewable.length > 0 && selectedCount === previewable.length;
+    const previewablePaths = new Set(previewable.map((item) => item.path));
     const counts = {
       ready: this._submittable.length,
       pending: this._items.filter((i) => i.status === 'already-pending').length,
@@ -298,12 +600,45 @@ class RequestPublishBulkApp extends LitElement {
           ${counts.ready} ready, ${counts.pending} already pending, ${counts.invalid} invalid.
           ${this._duplicates ? html`${this._duplicates} duplicate${this._duplicates === 1 ? '' : 's'} removed.` : nothing}
         </p>
-        <ul class="bulk-list">
+        ${previewable.length ? html`
+          <div class="bulk-preview-actions">
+            <label class="preview-option">
+              <input type="checkbox" .checked=${allSelected}
+                .indeterminate=${selectedCount > 0 && !allSelected} ?disabled=${this._busy}
+                @change=${(event) => this.handleSelectPreviews(event.target.checked)}>
+              <span>Select all pages needing preview</span>
+            </label>
+            <sl-button ?disabled=${this._busy || selectedCount === 0}
+              @click=${() => this.handlePreview(this._selectedPreviewItems)}>
+              Preview / refresh selected (${selectedCount})
+            </sl-button>
+          </div>` : nothing}
+        <ul class="bulk-list" aria-label="Page validation results" aria-live="polite">
           ${this._items.map((i) => html`
             <li class="bulk-item bulk-${i.status}">
               <span class="bulk-path">${i.path}</span>
-              <span class="bulk-status">${STATUS_LABELS[i.status]}</span>
+              <span class="bulk-status">
+                ${STATUS_LABELS[i.status]}
+                ${i.status === 'already-pending' && i.validationStatus ? html`
+                  / ${i.validationStatus === 'ready' ? 'Preview current' : STATUS_LABELS[i.validationStatus]}
+                ` : nothing}
+              </span>
               ${i.message ? html`<span class="bulk-detail">${i.message}</span>` : nothing}
+              ${i.sourceModified || i.previewModified ? html`
+                <span class="bulk-detail">
+                  Source saved: ${formatDate(i.sourceModified)}.
+                  Preview generated: ${formatDate(i.previewModified)}.
+                  Source included in preview: ${formatDate(i.previewSourceModified)}.
+                </span>` : nothing}
+              ${previewablePaths.has(i.path) ? html`
+                <div class="bulk-preview-actions bulk-detail">
+                  <label class="preview-option">
+                    <input type="checkbox" .checked=${this._selectedPreviewPaths.has(i.path)}
+                      aria-label=${`Select ${i.path} for preview`} ?disabled=${this._busy}
+                      @change=${(event) => this.handlePreviewSelection(i.path, event.target.checked)}>
+                    <span>Select for preview</span>
+                  </label>
+                </div>` : nothing}
             </li>
           `)}
         </ul>
@@ -311,36 +646,128 @@ class RequestPublishBulkApp extends LitElement {
     `;
   }
 
+  renderTranslations() {
+    const total = this._projectEntries.length;
+    const start = this._projectPage * PROJECT_PAGE_SIZE;
+    const selectedCount = this._selectedDestinations.size;
+    const allSelected = this._destinations.length > 0
+      && selectedCount === this._destinations.length;
+    return html`
+      <section aria-label="Translation project" class="translation-panel">
+        <p class="field-hint">Choose an active project. Only completed translation, copy, and rollout destinations can be requested for publication.</p>
+        <sl-button ?disabled=${this._busy} @click=${() => this.handleLoadProjects()}>
+          Refresh projects
+        </sl-button>
+        <div class="project-picker" aria-busy=${this._loadingProjects ? 'true' : 'false'}>
+          ${this._loadingProjects ? html`
+            <p class="project-loading" role="status">
+              <span class="project-spinner" aria-hidden="true"></span>
+              Loading translation projects...
+            </p>` : html`
+          <fieldset ?disabled=${this._busy || !this._projects.length}>
+            <legend>Translation project title</legend>
+            <ul class="project-list">
+            ${this._projects.map((project) => html`
+              <li>
+                <label class="project-option">
+                  <input type="radio" name="translation-project" value=${project.path}
+                    .checked=${this._projectPath === project.path} ?disabled=${!project.available}
+                    @change=${() => this.handleProjectSelect(project.path)}>
+                  <span>
+                    <strong>${project.title}</strong>
+                    <span class="project-meta">Modified: ${formatDate(project.lastModified)} - ${project.name}</span>
+                    ${!project.available ? html`<span class="project-meta">${project.error || project.reason}</span>` : nothing}
+                  </span>
+                </label>
+              </li>`)}
+            </ul>
+          </fieldset>`}
+          ${total ? html`
+            <nav class="project-pagination" aria-label="Translation project pages">
+              <sl-button ?disabled=${this._busy || this._projectPage === 0}
+                @click=${() => this.handleProjectPage(this._projectPage - 1)}>Previous</sl-button>
+              <span role="status">Projects ${start + 1}-${Math.min(start + PROJECT_PAGE_SIZE, total)} of ${total}
+                (page ${this._projectPage + 1} of ${this._projectPageCount})</span>
+              <sl-button ?disabled=${this._busy || this._projectPage + 1 >= this._projectPageCount}
+                @click=${() => this.handleProjectPage(this._projectPage + 1)}>Next</sl-button>
+              ${this._projects.some((project) => project.error) ? html`
+                <sl-button ?disabled=${this._busy}
+                  @click=${() => this.handleProjectPage(this._projectPage)}>Reload page</sl-button>` : nothing}
+            </nav>` : nothing}
+        </div>
+        ${this._project ? html`
+          <fieldset ?disabled=${this._busy}>
+            <legend>Completed destination folders</legend>
+            <label class="destination-option destination-select-all">
+              <input type="checkbox" .checked=${allSelected}
+                .indeterminate=${selectedCount > 0 && !allSelected}
+                ?disabled=${this._busy || this._destinations.length === 0}
+                @change=${(event) => this.handleSelectDestinations(event.target.checked)}>
+              <span>Select all destination folders</span>
+            </label>
+            ${this._destinations.map((destination) => html`
+              <label class="destination-option">
+                <input type="checkbox" .checked=${this._selectedDestinations.has(destination.id)}
+                  @change=${(event) => this.handleDestinationChange(destination.id, event.target.checked)}>
+                <span>${destination.label}: <code>${destination.location}</code> (${destination.paths.length} pages)</span>
+              </label>`)}
+          </fieldset>
+          <p class="field-hint">Incomplete destinations are excluded. Review the selected paths before validating.</p>
+          <details open>
+            <summary>Generated paths (${this._generatedPaths.length})</summary>
+            <ul class="generated-paths">
+              ${this._generatedPaths.map((path) => html`<li><code>${path}</code></li>`)}
+            </ul>
+          </details>` : nothing}
+      </section>
+    `;
+  }
+
   render() {
-    const busy = this._validating || this._submitting;
+    const busy = this._busy;
     const readyCount = this._submittable.length;
     const failedCount = this._failed.length;
     return html`
       <div class="bulk-app">
         <h1>Request Publish for Multiple Pages</h1>
         <p class="field-hint">Submits one pending request per page. Approvers review them in the Publish Requests inbox; nothing is published from here.</p>
-        ${this._message ? html`<div class="message ${this._message.type}">${this._message.text}</div>` : nothing}
+        ${this._message ? html`<div class="message ${this._message.type}" role=${this._message.type === 'error' ? 'alert' : 'status'}>${this._message.text}</div>` : nothing}
 
         <div class="bulk-row">
           <div class="form-group">
             <label for="org">Organization</label>
             <sl-input id="org" .value=${this._org} ?disabled=${busy}
-              @input=${(e) => { this._org = e.target.value; this._resetValidation(); }}></sl-input>
+              @input=${(e) => this.handleSiteChange('_org', e.target.value)}></sl-input>
           </div>
           <div class="form-group">
             <label for="site">Site</label>
             <sl-input id="site" .value=${this._site} ?disabled=${busy}
-              @input=${(e) => { this._site = e.target.value; this._resetValidation(); }}></sl-input>
+              @input=${(e) => this.handleSiteChange('_site', e.target.value)}></sl-input>
           </div>
         </div>
 
-        <div class="form-group">
+        <fieldset class="flow-picker" ?disabled=${busy}>
+          <legend>Choose how to add pages</legend>
+          <label>
+            <input type="radio" name="flow" value="paths" .checked=${this._flow === 'paths'}
+              @change=${() => this.handleFlowChange('paths')}>
+            Paste paths
+          </label>
+          <label>
+            <input type="radio" name="flow" value="translations" .checked=${this._flow === 'translations'}
+              @change=${() => this.handleFlowChange('translations')}>
+            Translation project
+          </label>
+        </fieldset>
+
+        ${this._flow === 'translations' ? this.renderTranslations() : html`<div class="form-group">
           <label for="paths">Page paths</label>
           <sl-textarea id="paths" rows="8" .value=${this._pathsText} ?disabled=${busy}
             placeholder="/fr/ca/home&#10;/fr/ca/products&#10;/de/de/home"
             @input=${(e) => { this._pathsText = e.target.value; this._resetValidation(); }}></sl-textarea>
           <span class="field-hint">One site-relative path per line.</span>
-        </div>
+        </div>`}
+        <p class="field-hint">Validate checks DA source existence and compares its last-saved timestamp with the source timestamp included in the preview. Missing or stale previews block that page until you explicitly preview it.</p>
 
         <div class="form-group">
           <label for="comment">Comment (shared by all requests)</label>

@@ -28,13 +28,13 @@ sl-button.pw-fill-accent::part(base) {
   color: #fff;
 }
 
+sl-button.pw-fill-accent::part(base):disabled {
+  opacity: 0.5;
+}
+
 sl-button.pw-fill-accent::part(base):hover:not(:disabled) {
   background: var(--pw-accent-hover);
   border-color: var(--pw-accent-hover);
-}
-
-sl-button.pw-fill-accent::part(base):disabled {
-  opacity: 0.5;
 }
 
 .form-group {
@@ -98,6 +98,21 @@ sl-button.pw-fill-accent::part(base):disabled {
   margin: 0 0 var(--s2-spacing-200);
 }
 
+.bulk-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2-spacing-200);
+  margin-bottom: var(--s2-spacing-200);
+}
+
+.preview-option {
+  display: flex;
+  align-items: center;
+  gap: var(--s2-spacing-100);
+  cursor: pointer;
+}
+
 .bulk-list {
   list-style: none;
   margin: 0;
@@ -146,7 +161,131 @@ sl-button.pw-fill-accent::part(base):disabled {
   color: light-dark(#8a6100, #f0c36d);
 }
 
-@media (min-width: 600px) {
+.bulk-stale .bulk-status,
+.bulk-needs-preview .bulk-status,
+.bulk-unverified .bulk-status {
+  color: light-dark(#8a6100, #f0c36d);
+}
+
+.bulk-missing .bulk-status,
+.bulk-error .bulk-status {
+  color: light-dark(#c9252d, #ff8a85);
+}
+
+.bulk-app fieldset {
+  margin: 0 0 var(--s2-spacing-300);
+  padding: var(--s2-spacing-200) var(--s2-spacing-300);
+  border: 1px solid var(--s2-gray-400);
+  border-radius: 8px;
+}
+
+.bulk-app legend {
+  font-weight: 600;
+}
+
+.flow-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2-spacing-300);
+}
+
+.flow-picker label,
+.destination-option {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2-spacing-100);
+  cursor: pointer;
+}
+
+.destination-option {
+  margin: var(--s2-spacing-100) 0;
+}
+
+.destination-select-all {
+  padding-bottom: var(--s2-spacing-200);
+  margin-bottom: var(--s2-spacing-200);
+  border-bottom: 1px solid var(--s2-gray-300);
+}
+
+.translation-panel {
+  margin-bottom: var(--s2-spacing-400);
+}
+
+.translation-panel > sl-button {
+  margin-bottom: var(--s2-spacing-300);
+}
+
+.project-picker {
+  margin-bottom: var(--s2-spacing-300);
+}
+
+.project-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.project-list > li + li {
+  border-top: 1px solid var(--s2-gray-300);
+}
+
+.project-option {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2-spacing-200);
+  padding: var(--s2-spacing-200) 0;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.project-meta {
+  display: block;
+  margin-top: var(--s2-spacing-100);
+  font-size: 12px;
+  color: var(--s2-gray-700);
+}
+
+.project-loading,
+.project-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2-spacing-200);
+}
+
+.project-spinner {
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--s2-gray-300);
+  border-top-color: var(--pw-accent);
+  border-radius: 50%;
+  animation: project-spin 0.8s linear infinite;
+}
+
+@keyframes project-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-spinner {
+    animation: none;
+  }
+}
+
+.generated-paths {
+  max-height: 240px;
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+.bulk-app :is(input, select, summary):focus-visible {
+  outline: 2px solid var(--pw-accent);
+  outline-offset: 3px;
+}
+
+@media (width >= 600px) {
   .bulk-row {
     grid-template-columns: 1fr 1fr;
   }
