@@ -489,6 +489,31 @@ test('translation project selection offers completed country rollouts but not la
   assert.match(app._projects[0].reason, /language\/country/);
 });
 
+test('completed country translations are selectable without a separate rollout', async () => {
+  const { app } = await createApp({
+    listTranslationProjects: async () => [{ path: '/project/test', name: 'test' }],
+    loadTranslationProject: async () => ({
+      title: 'en-pr-to-es-pr',
+      urls: [
+        { basePath: '/pr/press-release' },
+        { basePath: '/pr/fragments/global-announcement' },
+      ],
+      langs: [{
+        name: 'Spanish - Puerto Rico', action: 'translate', location: '/es',
+        translation: { status: 'complete', saved: 2 },
+        locales: [{ code: '/es/pr', active: true }],
+      }],
+    }),
+  });
+  await app.handleFlowChange('translations');
+  assert.equal(app._projects[0].available, true);
+  await app.handleProjectSelect('/project/test');
+  assert.deepEqual(Array.from(app._generatedPaths), [
+    '/es/pr/press-release', '/es/pr/fragments/global-announcement',
+  ]);
+  assert.equal(app._destinations[0].location, '/es/pr');
+});
+
 test('changing site clears project selection and validation results', async () => {
   const { app } = await createApp();
   app._projectPath = '/old/project';

@@ -39,8 +39,8 @@ function joinDestination(location, basePath) {
 
 /**
  * A language's location is its translation destination; locale.code is a
- * separate rollout destination. Only language/country folders are publishable;
- * language-only translation folders are intermediate content.
+ * separate rollout destination. A translated base path may already contain
+ * its country; group those saved paths under their configured locale folder.
  */
 export function getTranslationDestinations(project) {
   if (!Array.isArray(project.urls) || !Array.isArray(project.langs)) {
@@ -65,7 +65,8 @@ export function getTranslationDestinations(project) {
     return base;
   });
   const destinations = [];
-  const addDestination = (location, label) => {
+  const countryFolder = /^\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/?$/;
+  const addDestination = (location, label, locales = []) => {
     if (typeof location !== 'string' || !location.startsWith('/')) {
       throw new Error(`Missing or invalid destination folder for ${label}.`);
     }
@@ -73,9 +74,18 @@ export function getTranslationDestinations(project) {
     if (paths.some((path) => !isValidPath(path))) {
       throw new Error(`Invalid generated path for ${label}. Check the translation project.`);
     }
-    if (!/^\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/?$/.test(location)) return;
-    destinations.push({
-      id: `${label}:${location}`, location, label, paths,
+    const folders = countryFolder.test(location) ? [location]
+      : (Array.isArray(locales) ? locales : [])
+        .filter((locale) => locale.active !== false && countryFolder.test(locale.code)
+          && locale.code.startsWith(`${location.replace(/\/+$/, '')}/`))
+        .map((locale) => locale.code);
+    folders.forEach((folder) => {
+      const countryPaths = paths.filter((path) => path.startsWith(`${folder.replace(/\/+$/, '')}/`));
+      if (countryPaths.length) {
+        destinations.push({
+          id: `${label}:${folder}`, location: folder, label, paths: countryPaths,
+        });
+      }
     });
   };
 
@@ -84,7 +94,7 @@ export function getTranslationDestinations(project) {
     const translated = lang.action === 'translate' && isComplete(lang.translation, urls.length);
     const copied = lang.action === 'copy' && isComplete(lang.copy, urls.length);
     if (translated || copied) {
-      addDestination(lang.location, `${name} ${translated ? 'translation' : 'copy'}`);
+      addDestination(lang.location, `${name} ${translated ? 'translation' : 'copy'}`, lang.locales);
     }
     if (isComplete(lang.rollout, urls.length) && Array.isArray(lang.locales)) {
       lang.locales.filter((locale) => locale.active !== false
