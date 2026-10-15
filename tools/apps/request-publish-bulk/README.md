@@ -53,17 +53,24 @@ translation/copy destination; `locale.code` is a separate rollout destination,
 not a suffix to append to the language folder.
 
 The translation flow only offers destination folders matching `/<lang>/<country>`.
-Language-only folders such as `/fr` are intermediate translation content, not
-publish destinations. For example, a completed translation in `/fr` with a
+Language-only pages such as `/fr/fragments/test` are intermediate translation
+content, not publish destinations. For example, a completed translation in `/fr` with a
 completed rollout to `/fr/ca` offers `/fr/ca/fragments/fragment-test`, never
 `/fr/fragments/fragment-test`. A completed translation or copy directly into
-a language/country folder is still eligible without a rollout. The app does not
-invent a country or offer locales before their rollout is complete. This rule
+a language/country folder is still eligible without a rollout. A completed
+translation or copy into `/es` with base path `/pr/press-release` also qualifies:
+its saved path is already `/es/pr/press-release`. The app groups these paths
+under their configured active locale (such as `/es/pr`), without requiring
+rollout status or appending the country again. Locale saved counts describe
+rollouts and are not required for these directly saved translations/copies.
+The app does not invent a country or infer a country rollout from translation
+completion. This rule
 does not restrict manually pasted paths.
 
 Only completed translation/copy destinations and completed active locale
 rollouts are selectable. Saved counts, when supplied, must cover all selected
-source URLs. A translated language does not imply its locale rollout completed.
+source URLs. Status `translated` alone is not saved completion. A translated
+language does not imply its locale rollout completed.
 Unchecked URLs, incomplete destinations, and snapshot projects are excluded
 or reported as unsupported. Individual pages in a partially completed
 destination are not inferred to be complete.

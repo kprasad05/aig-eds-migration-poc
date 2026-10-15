@@ -100,6 +100,56 @@ test('never substitutes a language-only translation for incomplete country rollo
   assert.deepEqual(getTranslationDestinations(data), []);
 });
 
+test('completed translations preserve countries already present in base paths without requiring rollout', () => {
+  const data = project({
+    urls: [
+      { basePath: '/pr/press-release', suppliedPath: '/en/pr/press-release' },
+      { basePath: '/pr/fragments/global-announcement', suppliedPath: '/en/pr/fragments/global-announcement' },
+    ],
+    options: { 'source.language': { location: '/en' } },
+    langs: [{
+      name: 'Spanish - Puerto Rico', action: 'translate', location: '/es',
+      translation: { status: 'complete', saved: 2 },
+      locales: [{ code: '/es/pr', active: true }],
+    }],
+  });
+  const [destination] = getTranslationDestinations(data);
+  assert.equal(destination.location, '/es/pr');
+  assert.deepEqual(destination.paths, ['/es/pr/press-release', '/es/pr/fragments/global-announcement']);
+  data.urls = data.urls.map(({ suppliedPath }) => ({ suppliedPath }));
+  assert.deepEqual(getTranslationDestinations(data)[0].paths, destination.paths);
+  data.langs[0].translation.status = 'translated';
+  assert.deepEqual(getTranslationDestinations(data), []);
+  data.langs[0].translation.status = 'complete';
+  data.langs[0].translation.saved = 1;
+  assert.deepEqual(getTranslationDestinations(data), []);
+});
+
+test('directly saved country paths group only under configured active locales and ignore rollout counts', () => {
+  const data = project({
+    urls: [
+      { basePath: '/ca/home' }, { basePath: '/pr/home' },
+      { basePath: '/cafe/home' }, { basePath: '/fragments/home' },
+    ],
+    langs: [{
+      name: 'French', action: 'copy', location: '/fr/',
+      copy: { status: 'complete', saved: 4 },
+      rollout: { status: 'not started' },
+      locales: [
+        { code: '/fr/ca', active: true, saved: 0 },
+        { code: '/fr/pr/', active: true },
+        { code: '/fr/cafe', active: false },
+        { code: '/es/pr', active: true },
+      ],
+    }],
+  });
+  assert.deepEqual(getTranslationDestinations(data).map(({ paths }) => paths), [
+    ['/fr/ca/home'], ['/fr/pr/home'],
+  ]);
+  data.langs[0].locales = [];
+  assert.deepEqual(getTranslationDestinations(data), []);
+});
+
 test('only offers two-segment destination folders for translations, copies, and rollouts', () => {
   for (const location of ['/fr', '/de', '/fr/ca/nested']) {
     const data = project({
