@@ -551,14 +551,13 @@ test('translated projects without saved completion are selectable but still requ
 
 test('changing site clears project selection and validation results', async () => {
   const { app } = await createApp();
-  app._projectPath = '/old/project';
-  app._project = { title: 'Old project' };
+  app._selectedProjects = [{ path: '/old/project', title: 'Old project' }];
   app._projects = [{ title: 'Old project' }];
   app._projectEntries = [{ path: '/old/project' }];
   app._projectPage = 2;
   app._items = [{ path: '/fr/home', status: 'ready' }];
   app.handleSiteChange('_site', 'new-site');
-  assert.equal(app._project, null);
+  assert.equal(app._selectedProjects.length, 0);
   assert.equal(app._projects.length, 0);
   assert.equal(app._projectEntries.length, 0);
   assert.equal(app._projectPage, 0);
@@ -575,6 +574,139 @@ function completedProject(title) {
     }],
   };
 }
+
+test('multiple projects namespace destination choices and submit shared paths only once', async () => {
+  const { app, requests } = await createApp({
+    loadTranslationProject: async (_org, _site, path) => ({
+      ...completedProject(path),
+      urls: [{ basePath: '/shared' }, { basePath: path === '/project/a' ? '/first' : '/second' }],
+      langs: [{
+        name: 'French', action: 'translate', location: '/fr/ca',
+        translation: { status: 'complete', saved: 2 },
+      }],
+    }),
+  });
+  app._flow = 'translations';
+  await app.handleProjectSelect('/project/a');
+  await app.handleProjectSelect('/project/b');
+  assert.equal(app._selectedProjects.length, 2);
+  assert.equal(app._destinations.length, 2);
+  assert.notEqual(app._destinations[0].id, app._destinations[1].id);
+  assert.deepEqual(Array.from(app._generatedPaths), ['/fr/ca/shared', '/fr/ca/first', '/fr/ca/second']);
+  const rendered = app.renderTranslations();
+  assert.match(rendered, /Selected projects \(2\)/);
+  assert.match(rendered, /<legend>\/project\/a<\/legend>/);
+  assert.match(rendered, /<legend>\/project\/b<\/legend>/);
+
+  app.handleDestinationChange(app._destinations[0].id, false);
+  assert.deepEqual(Array.from(app._generatedPaths), ['/fr/ca/shared', '/fr/ca/second']);
+  app.handleSelectDestinations(true);
+  await app.handleValidate();
+  assert.equal(app._items.length, 3);
+  await app.handleSubmit();
+  assert.equal(requests.length, 3);
+  assert.equal(new Set(requests.map(([request]) => request.path)).size, 3);
+
+  await app.handleProjectSelect('/project/a', false);
+  assert.equal(app._selectedProjects.length, 1);
+  assert.equal(app._selectedProjects[0].path, '/project/b');
+  assert.equal(app._selectedDestinations.size, 1);
+  assert.equal(app._destinations.length, 1);
+  assert.equal(app._items.length, 0);
+  assert.deepEqual(Array.from(app._generatedPaths), ['/fr/ca/shared', '/fr/ca/second']);
+});
+
+test('translation and rollout projects can be combined across pages with independent folder selections', async () => {
+  let reads = 0;
+  const { app } = await createApp({
+    listTranslationProjects: async () => Array.from({ length: 4 }, (_, index) => ({
+      path: `/project/${index}`, name: String(index),
+    })),
+    loadTranslationProject: async (_org, _site, path) => {
+      reads += 1;
+      if (path !== '/project/3') return completedProject(path);
+      return {
+        title: 'Country rollout',
+        urls: [{ basePath: '/home' }],
+        langs: [{
+          name: 'English', action: 'rollout', location: '/en',
+          rollout: { status: 'complete', saved: 1 },
+          locales: [{ code: '/en/ca', active: true, saved: 1 }],
+        }],
+      };
+    },
+  });
+  await app.handleFlowChange('translations');
+  await app.handleProjectSelect('/project/0');
+  app.handleDestinationChange(app._destinations[0].id, false);
+  await app.handleProjectPage(1);
+  await app.handleProjectSelect('/project/3');
+  assert.deepEqual(Array.from(app._generatedPaths), ['/en/ca/home']);
+  assert.equal(app._selectedProjects.length, 2);
+  await app.handleProjectPage(0);
+  assert.equal(app._selectedProjects.length, 2);
+  assert.equal(app._selectedDestinations.size, 1);
+  const beforeDuplicate = reads;
+  await app.handleProjectSelect('/project/0');
+  assert.equal(reads, beforeDuplicate);
+  assert.equal(app._selectedProjects.length, 2);
+  app.handleSelectDestinations(true);
+  assert.deepEqual(Array.from(app._generatedPaths), ['/fr/ca/home', '/en/ca/home']);
+  app.handleSelectDestinations(false);
+  assert.equal(app._generatedPaths.length, 0);
+  app._items = [{ path: '/old', status: 'ready' }];
+  app.handleClearProjects();
+  assert.equal(app._selectedProjects.length, 0);
+  assert.equal(app._destinations.length, 0);
+  assert.equal(app._selectedDestinations.size, 0);
+  assert.equal(app._items.length, 0);
+});
+
+test('failed and ineligible selections do not discard other projects or folder choices', async () => {
+  const { app, toasts, logs } = await createApp({
+    loadTranslationProject: async (_org, _site, path) => {
+      if (path === '/project/denied') throw new Error('Project denied (403)');
+      if (path === '/project/empty') return { title: 'Empty', urls: [{ basePath: '/home' }], langs: [] };
+      return completedProject(path);
+    },
+  });
+  await app.handleProjectSelect('/project/a');
+  const selectedId = app._destinations[0].id;
+  app.handleDestinationChange(selectedId, false);
+  await app.handleProjectSelect('/project/denied');
+  assert.equal(app._selectedProjects.length, 1);
+  assert.equal(app._selectedProjects[0].path, '/project/a');
+  assert.equal(app._selectedDestinations.size, 0);
+  assert.match(app._message.text, /403/);
+  assert.equal(toasts.at(-1).variant, 'error');
+  assert.ok(logs.some((args) => String(args[0]).includes('Project selection failed')));
+  await app.handleProjectSelect('/project/empty');
+  assert.equal(app._selectedProjects.length, 1);
+  assert.equal(app._destinations[0].id, selectedId);
+  assert.equal(app._selectedDestinations.size, 0);
+  assert.equal(toasts.at(-1).variant, 'warning');
+  assert.equal(app._loadingProjects, false);
+  await app.handleProjectSelect('/project/a', false);
+  assert.equal(app._selectedProjects.length, 0);
+  assert.equal(app._destinations.length, 0);
+});
+
+test('project selection, removal, and clearing cannot change while the app is busy', async () => {
+  const { app } = await createApp({
+    loadTranslationProject: async (_org, _site, path) => completedProject(path),
+  });
+  await app.handleProjectSelect('/project/a');
+  for (const state of ['_loadingProjects', '_validating', '_submitting']) {
+    app[state] = true;
+    await app.handleProjectSelect('/project/b');
+    await app.handleProjectSelect('/project/a', false);
+    app.handleClearProjects();
+    assert.equal(app._selectedProjects.length, 1);
+    assert.equal(app._selectedProjects[0].path, '/project/a');
+    assert.equal(app._selectedDestinations.size, 1);
+    app[state] = false;
+  }
+});
 
 test('select all and deselect all update generated paths and clear old validation', async () => {
   const { app } = await createApp();
@@ -667,7 +799,7 @@ test('shows loading state until asynchronous page reads finish and prevents over
   assert.equal(app._projects[0].title, 'Loaded asynchronously');
 });
 
-test('changing project pages clears selection and validated paths before loading the next page', async () => {
+test('changing project pages preserves selections and validation while refreshing clears them', async () => {
   const { app } = await createApp({
     listTranslationProjects: async () => Array.from({ length: 4 }, (_, index) => ({
       path: `/project/${index}`, name: String(index),
@@ -676,16 +808,24 @@ test('changing project pages clears selection and validated paths before loading
   });
   await app.handleLoadProjects();
   await app.handleProjectSelect('/project/0');
+  const selectedIds = [...app._selectedDestinations];
   app._items = [{ path: '/fr/home', status: 'ready' }];
   await app.handleProjectPage(1);
-  assert.equal(app._project, null);
-  assert.equal(app._projectPath, '');
-  assert.equal(app._generatedPaths.length, 0);
-  assert.equal(app._items.length, 0);
+  assert.equal(app._selectedProjects[0].path, '/project/0');
+  assert.deepEqual([...app._selectedDestinations], selectedIds);
+  assert.deepEqual(Array.from(app._generatedPaths), ['/fr/ca/home']);
+  assert.equal(app._items.length, 1);
   assert.equal(app._projects[0].path, '/project/3');
+  await app.handleProjectPage(0);
+  assert.match(app.renderTranslations(), /Selected projects \(1\)/);
+  assert.match(app.renderTranslations(), /\.checked=true/);
   await app.handleLoadProjects();
   assert.equal(app._projectPage, 0);
   assert.equal(app._projects.length, 3);
+  assert.equal(app._selectedProjects.length, 0);
+  assert.equal(app._destinations.length, 0);
+  assert.equal(app._selectedDestinations.size, 0);
+  assert.equal(app._items.length, 0);
 });
 
 test('empty lists and list failures clear the spinner and do not leave stale page metadata', async () => {

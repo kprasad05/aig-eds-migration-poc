@@ -246,11 +246,16 @@ sl-button.pw-fill-accent::part(base):hover:not(:disabled) {
 }
 
 .project-loading,
-.project-pagination {
+.project-pagination,
+.project-selection-summary {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--s2-spacing-200);
+}
+
+.project-selection-summary {
+  margin-bottom: var(--s2-spacing-300);
 }
 
 .project-spinner {

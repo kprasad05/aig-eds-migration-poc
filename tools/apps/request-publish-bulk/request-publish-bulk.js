@@ -108,8 +108,7 @@ class RequestPublishBulkApp extends LitElement {
     _projectEntries: { state: true },
     _projectPage: { state: true },
     _loadingProjects: { state: true },
-    _projectPath: { state: true },
-    _project: { state: true },
+    _selectedProjects: { state: true },
     _destinations: { state: true },
     _selectedDestinations: { state: true },
     _selectedPreviewPaths: { state: true },
@@ -132,8 +131,7 @@ class RequestPublishBulkApp extends LitElement {
     this._projectEntries = [];
     this._projectPage = 0;
     this._loadingProjects = false;
-    this._projectPath = '';
-    this._project = null;
+    this._selectedProjects = [];
     this._destinations = [];
     this._selectedDestinations = new Set();
     this._selectedPreviewPaths = new Set();
@@ -206,13 +204,12 @@ class RequestPublishBulkApp extends LitElement {
     this._projects = [];
     this._projectEntries = [];
     this._projectPage = 0;
-    this._clearProject();
+    this._clearProjects();
     this._resetValidation();
   }
 
-  _clearProject() {
-    this._projectPath = '';
-    this._project = null;
+  _clearProjects() {
+    this._selectedProjects = [];
     this._destinations = [];
     this._selectedDestinations = new Set();
   }
@@ -227,7 +224,7 @@ class RequestPublishBulkApp extends LitElement {
   async handleLoadProjects() {
     if (this._busy || !this._checkSite()) return;
     this._resetValidation();
-    this._clearProject();
+    this._clearProjects();
     this._projects = [];
     this._projectEntries = [];
     this._projectPage = 0;
@@ -246,8 +243,6 @@ class RequestPublishBulkApp extends LitElement {
 
   async handleProjectPage(page) {
     if (this._busy || !Number.isInteger(page) || page < 0 || page >= this._projectPageCount) return;
-    this._resetValidation();
-    this._clearProject();
     this._loadingProjects = true;
     try {
       await this._loadProjectPage(page);
@@ -300,28 +295,51 @@ class RequestPublishBulkApp extends LitElement {
     }
   }
 
-  async handleProjectSelect(path) {
-    if (this._busy) return;
+  async handleProjectSelect(path, checked = true) {
+    if (this._busy || !path) return;
+    const selected = this._selectedProjects.some((project) => project.path === path);
+    if (checked === selected) return;
     this._resetValidation();
-    this._clearProject();
-    if (!path) return;
-    this._projectPath = path;
+    if (!checked) {
+      this._selectedProjects = this._selectedProjects.filter((project) => project.path !== path);
+      this._destinations = this._destinations.filter(
+        (destination) => destination.projectPath !== path,
+      );
+      const remainingIds = new Set(this._destinations.map((destination) => destination.id));
+      this._selectedDestinations = new Set(
+        [...this._selectedDestinations].filter((id) => remainingIds.has(id)),
+      );
+      return;
+    }
     this._loadingProjects = true;
     try {
-      this._project = await loadTranslationProject(
+      const project = await loadTranslationProject(
         this._org.trim(), this._site.trim(), path, this.token,
       );
-      this._destinations = getTranslationDestinations(this._project);
-      this._selectedDestinations = new Set(this._destinations.map((destination) => destination.id));
-      if (!this._destinations.length) {
+      const destinations = getTranslationDestinations(project).map((destination) => ({
+        ...destination, id: `${path}:${destination.id}`, projectPath: path,
+      }));
+      if (!destinations.length) {
         this._notify('warning', 'This project has no eligible language/country destinations. Translation must be translated or complete; copy and rollout must be complete. Language-only pages are excluded.');
+        return;
       }
+      this._selectedProjects = [...this._selectedProjects, { path, title: project.title }];
+      this._destinations = [...this._destinations, ...destinations];
+      this._selectedDestinations = new Set([
+        ...this._selectedDestinations, ...destinations.map((destination) => destination.id),
+      ]);
     } catch (error) {
-      this._clearProject();
+      console.error('[Request Publish Bulk] Project selection failed', { path, message: error.message });
       this._notify('error', error.message);
     } finally {
       this._loadingProjects = false;
     }
+  }
+
+  handleClearProjects() {
+    if (this._busy) return;
+    this._clearProjects();
+    this._resetValidation();
   }
 
   handleDestinationChange(id, checked) {
@@ -391,7 +409,7 @@ class RequestPublishBulkApp extends LitElement {
     if (items.length === 0) {
       this._items = [];
       this._notify('error', this._flow === 'translations'
-        ? 'Select a project and at least one eligible destination folder.'
+        ? 'Select at least one project and an eligible destination folder.'
         : 'Paste at least one page path.');
       return;
     }
@@ -653,12 +671,13 @@ class RequestPublishBulkApp extends LitElement {
     const allSelected = this._destinations.length > 0
       && selectedCount === this._destinations.length;
     return html`
-      <section aria-label="Translation project" class="translation-panel">
-        <p class="field-hint">Choose an active project. Translated or completed translations and completed copies or rollouts matching /&lt;lang&gt;/&lt;country&gt; can be validated. Language-only pages are excluded.</p>
+      <section aria-label="Translation projects" class="translation-panel">
+        <p class="field-hint">Choose one or more active translation or rollout projects. Selections are kept across pages. Translated or completed translations and completed copies or rollouts matching /&lt;lang&gt;/&lt;country&gt; can be validated. Language-only pages are excluded.</p>
         <p class="field-hint">Translations marked "save unconfirmed" have translation results but no confirmed save completion. Validate checks existing destination pages and preview freshness; it cannot prove those pages contain this project's latest translation.</p>
         <sl-button ?disabled=${this._busy} @click=${() => this.handleLoadProjects()}>
           Refresh projects
         </sl-button>
+        <p class="field-hint">Refresh projects reloads the list and clears selected projects.</p>
         <div class="project-picker" aria-busy=${this._loadingProjects ? 'true' : 'false'}>
           ${this._loadingProjects ? html`
             <p class="project-loading" role="status">
@@ -666,14 +685,15 @@ class RequestPublishBulkApp extends LitElement {
               Loading translation projects...
             </p>` : html`
           <fieldset ?disabled=${this._busy || !this._projects.length}>
-            <legend>Translation project title</legend>
+            <legend>Active projects</legend>
             <ul class="project-list">
             ${this._projects.map((project) => html`
               <li>
                 <label class="project-option">
-                  <input type="radio" name="translation-project" value=${project.path}
-                    .checked=${this._projectPath === project.path} ?disabled=${!project.available}
-                    @change=${() => this.handleProjectSelect(project.path)}>
+                  <input type="checkbox" name="translation-project" value=${project.path}
+                    .checked=${this._selectedProjects.some((selected) => selected.path === project.path)}
+                    ?disabled=${!project.available && !this._selectedProjects.some((selected) => selected.path === project.path)}
+                    @change=${(event) => this.handleProjectSelect(project.path, event.target.checked)}>
                   <span>
                     <strong>${project.title}</strong>
                     <span class="project-meta">Modified: ${formatDate(project.lastModified)} - ${project.name}</span>
@@ -696,7 +716,13 @@ class RequestPublishBulkApp extends LitElement {
                   @click=${() => this.handleProjectPage(this._projectPage)}>Reload page</sl-button>` : nothing}
             </nav>` : nothing}
         </div>
-        ${this._project ? html`
+        ${this._selectedProjects.length ? html`
+          <div class="project-selection-summary">
+            <strong>Selected projects (${this._selectedProjects.length})</strong>
+            <sl-button ?disabled=${this._busy} @click=${() => this.handleClearProjects()}>
+              Clear selected projects
+            </sl-button>
+          </div>
           <fieldset ?disabled=${this._busy}>
             <legend>Translation destination folders</legend>
             <label class="destination-option destination-select-all">
@@ -706,16 +732,25 @@ class RequestPublishBulkApp extends LitElement {
                 @change=${(event) => this.handleSelectDestinations(event.target.checked)}>
               <span>Select all destination folders</span>
             </label>
-            ${this._destinations.map((destination) => html`
-              <label class="destination-option">
-                <input type="checkbox" .checked=${this._selectedDestinations.has(destination.id)}
-                  @change=${(event) => this.handleDestinationChange(destination.id, event.target.checked)}>
-                <span>${destination.label}: <code>${destination.location}</code> (${destination.paths.length} pages)</span>
-              </label>`)}
+            ${this._selectedProjects.map((project) => html`
+              <fieldset class="project-destinations">
+                <legend>${project.title}</legend>
+                <sl-button ?disabled=${this._busy}
+                  aria-label=${`Remove ${project.title} from selected projects`}
+                  @click=${() => this.handleProjectSelect(project.path, false)}>Remove project</sl-button>
+                ${this._destinations.filter((destination) => destination.projectPath === project.path)
+    .map((destination) => html`
+                    <label class="destination-option">
+                      <input type="checkbox" .checked=${this._selectedDestinations.has(destination.id)}
+                        @change=${(event) => this.handleDestinationChange(destination.id, event.target.checked)}>
+                      <span>${destination.label}: <code>${destination.location}</code> (${destination.paths.length} pages)</span>
+                    </label>`)}
+              </fieldset>`)}
           </fieldset>
           <p class="field-hint">Untranslated pages and incomplete copies or rollouts are excluded. Review the selected paths before validating.</p>
           <details open>
             <summary>Generated paths (${this._generatedPaths.length})</summary>
+            <p class="field-hint">Combined paths from all selected destination folders. Pages shared by multiple projects appear only once.</p>
             <ul class="generated-paths">
               ${this._generatedPaths.map((path) => html`<li><code>${path}</code></li>`)}
             </ul>
@@ -757,7 +792,7 @@ class RequestPublishBulkApp extends LitElement {
           <label>
             <input type="radio" name="flow" value="translations" .checked=${this._flow === 'translations'}
               @change=${() => this.handleFlowChange('translations')}>
-            Translation project
+            Translation / rollout projects
           </label>
         </fieldset>
 

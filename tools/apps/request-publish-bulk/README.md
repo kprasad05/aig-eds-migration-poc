@@ -26,9 +26,17 @@ an environment override, localhost expects a Worker at localhost:8787.
 ## Two input flows
 
 - **Paste paths:** enter one site-relative path or page URL per line.
-- **Translation project:** load active projects for the selected organization
-  and site. Select a project title and the eligible destination folders to
-  include. Review the generated page paths before validating.
+- **Translation / rollout projects:** load active projects for the selected
+  organization and site. Check one or more project titles and choose the
+  eligible destination folders to include. Review the combined generated
+  page paths before validating.
+
+**Selected projects (N)** shows destination folders grouped by project,
+including selections on other pages. Use **Remove project**, uncheck its title,
+or **Clear selected projects** to remove selections. Destination selections are
+independent per project, even when folder names match. Shared page paths are
+deduplicated across projects before validation, previewing, and submission;
+one page receives at most one publish request per run.
 
 Use the **Select all destination folders** checkbox to select or deselect all
 eligible destination folders at once. It shows a mixed state when only some
@@ -41,10 +49,13 @@ The list supplies file paths, not titles. Projects are ordered by most recently
 modified, with three entries per page. The app asynchronously reads only the
 visible page's project JSON files from `https://content.da.live{projectPath}`
 to obtain titles and completion information. A spinner indicates loading.
-Previous/Next loads another page on demand; changing pages clears the selected
-project and validation results. The selected project is re-read before its
-destination folders are displayed. Refresh projects reloads the list and returns
-to page one; Reload page retries failed project reads on the current page.
+Previous/Next loads another page on demand without clearing selected projects,
+destination selections, or validation results. Each project is re-read when
+selected before adding its destination folders. A failed selection leaves other
+selected projects intact. Adding or removing a project clears validation results.
+Refresh projects reloads the list, clears selected projects and validation, and
+returns to page one; Reload page retries failed project reads on the current page
+without clearing selections. Changing organization or site also clears selections.
 
 Paths combine each selected URL's `basePath` with the destination folder.
 When `basePath` is absent, the app derives it from `suppliedPath` by removing
