@@ -271,7 +271,7 @@ class RequestPublishBulkApp extends LitElement {
           this._org.trim(), this._site.trim(), entry.path, this.token,
         );
         let available = false;
-        let reason = 'No completed language/country destinations';
+        let reason = 'No eligible language/country destinations: translation must be translated or complete; copy and rollout must be complete.';
         if (Array.isArray(project.langs) && Array.isArray(project.urls)) {
           try {
             available = getTranslationDestinations(project).length > 0;
@@ -296,7 +296,7 @@ class RequestPublishBulkApp extends LitElement {
     } else if (!this._projectEntries.length) {
       this._notify('info', 'No active translation projects were found for this site.');
     } else if (!projects.some((project) => project.available)) {
-      this._notify('info', 'No completed language/country destinations on this page. Browse another page for more active projects.');
+      this._notify('info', 'No eligible language/country destinations on this page. Review the project details or browse another page.');
     }
   }
 
@@ -314,7 +314,7 @@ class RequestPublishBulkApp extends LitElement {
       this._destinations = getTranslationDestinations(this._project);
       this._selectedDestinations = new Set(this._destinations.map((destination) => destination.id));
       if (!this._destinations.length) {
-        this._notify('warning', 'This project has no completed language/country destinations. Language-only folders are excluded. Refresh the project list.');
+        this._notify('warning', 'This project has no eligible language/country destinations. Translation must be translated or complete; copy and rollout must be complete. Language-only pages are excluded.');
       }
     } catch (error) {
       this._clearProject();
@@ -391,7 +391,7 @@ class RequestPublishBulkApp extends LitElement {
     if (items.length === 0) {
       this._items = [];
       this._notify('error', this._flow === 'translations'
-        ? 'Select a project and at least one completed destination folder.'
+        ? 'Select a project and at least one eligible destination folder.'
         : 'Paste at least one page path.');
       return;
     }
@@ -654,7 +654,8 @@ class RequestPublishBulkApp extends LitElement {
       && selectedCount === this._destinations.length;
     return html`
       <section aria-label="Translation project" class="translation-panel">
-        <p class="field-hint">Choose an active project. Only completed translation, copy, and rollout destinations matching /&lt;lang&gt;/&lt;country&gt; can be requested for publication. Language-only folders are excluded.</p>
+        <p class="field-hint">Choose an active project. Translated or completed translations and completed copies or rollouts matching /&lt;lang&gt;/&lt;country&gt; can be validated. Language-only pages are excluded.</p>
+        <p class="field-hint">Translations marked "save unconfirmed" have translation results but no confirmed save completion. Validate checks existing destination pages and preview freshness; it cannot prove those pages contain this project's latest translation.</p>
         <sl-button ?disabled=${this._busy} @click=${() => this.handleLoadProjects()}>
           Refresh projects
         </sl-button>
@@ -697,7 +698,7 @@ class RequestPublishBulkApp extends LitElement {
         </div>
         ${this._project ? html`
           <fieldset ?disabled=${this._busy}>
-            <legend>Completed destination folders</legend>
+            <legend>Translation destination folders</legend>
             <label class="destination-option destination-select-all">
               <input type="checkbox" .checked=${allSelected}
                 .indeterminate=${selectedCount > 0 && !allSelected}
@@ -712,7 +713,7 @@ class RequestPublishBulkApp extends LitElement {
                 <span>${destination.label}: <code>${destination.location}</code> (${destination.paths.length} pages)</span>
               </label>`)}
           </fieldset>
-          <p class="field-hint">Incomplete destinations are excluded. Review the selected paths before validating.</p>
+          <p class="field-hint">Untranslated pages and incomplete copies or rollouts are excluded. Review the selected paths before validating.</p>
           <details open>
             <summary>Generated paths (${this._generatedPaths.length})</summary>
             <ul class="generated-paths">

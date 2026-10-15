@@ -514,6 +514,41 @@ test('completed country translations are selectable without a separate rollout',
   assert.equal(app._destinations[0].location, '/es/pr');
 });
 
+test('translated projects without saved completion are selectable but still require content validation', async () => {
+  let status = 'missing';
+  const { app, requests, previews } = await createApp({
+    listTranslationProjects: async () => [{ path: '/project/test', name: 'test' }],
+    loadTranslationProject: async () => ({
+      title: 'update-global-announcement-rollout-copy',
+      urls: [{ basePath: '/ca/fragments/global-announcement' }],
+      langs: [{
+        name: 'French - Canada', action: 'translate', location: '/fr',
+        translation: { status: 'translated', sent: 1, translated: 1 },
+        locales: [{ code: '/fr/ca', active: true }],
+      }],
+    }),
+    validateContent: async () => ({ status, message: 'Content checked' }),
+  });
+  await app.handleFlowChange('translations');
+  assert.equal(app._projects[0].available, true);
+  await app.handleProjectSelect('/project/test');
+  assert.deepEqual(Array.from(app._generatedPaths), ['/fr/ca/fragments/global-announcement']);
+  assert.match(app.renderTranslations(), /save unconfirmed/);
+  for (const blocked of ['missing', 'stale', 'unverified']) {
+    status = blocked;
+    await app.handleValidate();
+    assert.equal(app._items[0].status, blocked);
+    assert.equal(app._submittable.length, 0);
+    await app.handleSubmit();
+  }
+  assert.equal(requests.length, 0);
+  assert.equal(previews.length, 0);
+  status = 'ready';
+  await app.handleValidate();
+  assert.equal(app._submittable.length, 1);
+  assert.equal(requests.length, 0);
+});
+
 test('changing site clears project selection and validation results', async () => {
   const { app } = await createApp();
   app._projectPath = '/old/project';

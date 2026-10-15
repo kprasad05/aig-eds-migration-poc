@@ -91,10 +91,15 @@ export function getTranslationDestinations(project) {
 
   project.langs.forEach((lang) => {
     const name = lang.name || lang.code || 'Language';
-    const translated = lang.action === 'translate' && isComplete(lang.translation, urls.length);
+    const saveUnconfirmed = lang.translation?.status === 'translated'
+      && (lang.translation.translated === undefined
+        || Number(lang.translation.translated) >= urls.length);
+    const translated = lang.action === 'translate'
+      && (isComplete(lang.translation, urls.length) || saveUnconfirmed);
     const copied = lang.action === 'copy' && isComplete(lang.copy, urls.length);
     if (translated || copied) {
-      addDestination(lang.location, `${name} ${translated ? 'translation' : 'copy'}`, lang.locales);
+      const label = `${name} ${translated ? 'translation' : 'copy'}${translated && saveUnconfirmed ? ' (save unconfirmed)' : ''}`;
+      addDestination(lang.location, label, lang.locales);
     }
     if (isComplete(lang.rollout, urls.length) && Array.isArray(lang.locales)) {
       lang.locales.filter((locale) => locale.active !== false
