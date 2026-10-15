@@ -69,7 +69,7 @@ test('preserves sheets and maps trailing-slash pages to index', () => {
   assert.deepEqual(getTranslationDestinations(data)[0].paths, ['/en/ca/index', '/en/ca/data.json']);
 });
 
-test('does not infer saved translation or rollout from translated status alone', () => {
+test('does not invent country pages or completed rollouts from language-only translated content', () => {
   const data = project();
   data.langs[0].rollout.status = 'not started';
   data.langs[1].translation.status = 'translated';
@@ -119,10 +119,33 @@ test('completed translations preserve countries already present in base paths wi
   data.urls = data.urls.map(({ suppliedPath }) => ({ suppliedPath }));
   assert.deepEqual(getTranslationDestinations(data)[0].paths, destination.paths);
   data.langs[0].translation.status = 'translated';
-  assert.deepEqual(getTranslationDestinations(data), []);
+  assert.deepEqual(getTranslationDestinations(data)[0].paths, destination.paths);
+  assert.match(getTranslationDestinations(data)[0].label, /save unconfirmed/);
   data.langs[0].translation.status = 'complete';
   data.langs[0].translation.saved = 1;
   assert.deepEqual(getTranslationDestinations(data), []);
+});
+
+test('translated results can be validated without saved or rollout counts but not before translation finishes', () => {
+  const data = project({
+    urls: [{ basePath: '/ca/fragments/global-announcement' }],
+    langs: [{
+      name: 'French - Canada', action: 'translate', location: '/fr',
+      translation: { status: 'translated', sent: 1, translated: 1 },
+      locales: [{ code: '/fr/ca', active: true }],
+    }],
+  });
+  assert.deepEqual(getTranslationDestinations(data)[0].paths, ['/fr/ca/fragments/global-announcement']);
+  data.langs[0].translation.saved = 0;
+  assert.equal(getTranslationDestinations(data).length, 1);
+  data.langs[0].translation.translated = 0;
+  assert.deepEqual(getTranslationDestinations(data), []);
+  delete data.langs[0].translation.translated;
+  assert.equal(getTranslationDestinations(data).length, 1);
+  for (const status of ['created', 'starting', 'saving', 'error', 'not started']) {
+    data.langs[0].translation.status = status;
+    assert.deepEqual(getTranslationDestinations(data), [], status);
+  }
 });
 
 test('directly saved country paths group only under configured active locales and ignore rollout counts', () => {

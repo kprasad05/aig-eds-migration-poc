@@ -27,11 +27,11 @@ an environment override, localhost expects a Worker at localhost:8787.
 
 - **Paste paths:** enter one site-relative path or page URL per line.
 - **Translation project:** load active projects for the selected organization
-  and site. Select a project title and the completed destination folders to
+  and site. Select a project title and the eligible destination folders to
   include. Review the generated page paths before validating.
 
 Use the **Select all destination folders** checkbox to select or deselect all
-completed destination folders at once. It shows a mixed state when only some
+eligible destination folders at once. It shows a mixed state when only some
 folders are selected. Selection changes update the generated paths and clear
 previous validation results; validate the new selection before submitting.
 
@@ -67,10 +67,14 @@ The app does not invent a country or infer a country rollout from translation
 completion. This rule
 does not restrict manually pasted paths.
 
-Only completed translation/copy destinations and completed active locale
-rollouts are selectable. Saved counts, when supplied, must cover all selected
-source URLs. Status `translated` alone is not saved completion. A translated
-language does not imply its locale rollout completed.
+Translations with status `translated` or `complete`, completed copies, and
+completed active locale rollouts are selectable. For `translated`, the translated
+count, when supplied, must cover all selected source URLs; saved completion is
+not required. These destinations are labeled **save unconfirmed**. Validation
+still checks page existence and preview freshness, but cannot prove an existing
+page contains this project's newest translation. For `complete`, saved counts,
+when supplied, must cover all selected source URLs. A translated language does
+not imply its locale rollout completed.
 Unchecked URLs, incomplete destinations, and snapshot projects are excluded
 or reported as unsupported. Individual pages in a partially completed
 destination are not inferred to be complete.
