@@ -15,3 +15,11 @@
   font-size: var(--body-font-size-xs);
   text-align: center;
 }
+
+.dm-image.rounded img {
+  border-radius: 8px;
+}
+
+.dm-image.left-caption .dm-image-caption {
+  text-align: left;
+}

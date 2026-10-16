@@ -22,6 +22,52 @@
       "options": [
         { "label": "No image", "value": "no-image" }
       ]
+    },
+    {
+      "label": "Video Feature",
+      "name": "Video Feature",
+      "options": [
+        { "label": "Autoplay", "value": "autoplay" }
+      ]
+    },
+    {
+      "label": "Cards",
+      "name": "Cards",
+      "options": [
+        { "label": "No border", "value": "no-border" },
+        { "label": "Square image", "value": "square-image" }
+      ]
+    },
+    {
+      "label": "Cards Story",
+      "name": "Cards Story",
+      "options": [
+        { "label": "Single column", "value": "single-column" },
+        { "label": "Stacked", "value": "stacked" }
+      ]
+    },
+    {
+      "label": "Columns",
+      "name": "Columns",
+      "options": [
+        { "label": "Reverse order", "value": "reverse" },
+        { "label": "Top aligned", "value": "top-aligned" }
+      ]
+    },
+    {
+      "label": "Hero",
+      "name": "Hero",
+      "options": [
+        { "label": "Short", "value": "short" }
+      ]
+    },
+    {
+      "label": "DM Image",
+      "name": "DM Image",
+      "options": [
+        { "label": "Rounded corners", "value": "rounded" },
+        { "label": "Left-aligned caption", "value": "left-caption" }
+      ]
     }
   ]
 }

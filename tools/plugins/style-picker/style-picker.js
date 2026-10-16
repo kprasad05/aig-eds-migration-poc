@@ -17,17 +17,22 @@ function buildMetadataHtml(keys) {
   const { actions } = await DA_SDK;
   const config = await (await fetch('/tools/plugins/style-picker/styles.json')).json();
 
-  const targets = [
+  const allTargets = [
     {
-      type: 'section', label: config.section.label, multiple: true, options: config.section.options,
+      id: 'section', type: 'section', label: config.section.label, multiple: true, options: config.section.options,
     },
     {
-      type: 'metadata', label: config.page.label, multiple: true, options: config.page.options,
+      id: 'page', type: 'metadata', label: config.page.label, multiple: true, options: config.page.options,
     },
     ...config.blocks.map((b) => ({
-      type: 'block', label: b.label, name: b.name, multiple: true, options: b.options,
+      id: b.name.toLowerCase().replace(/\s+/g, '-'), type: 'block', label: b.label, name: b.name, multiple: true, options: b.options,
     })),
   ];
+
+  // ?target=<section|page|block-name> scopes the plugin to a single target.
+  const scope = new URLSearchParams(window.location.search).get('target');
+  const scoped = allTargets.filter((t) => t.id === scope);
+  const targets = scoped.length ? scoped : allTargets;
 
   const container = document.createElement('div');
   container.className = 'style-picker';
@@ -101,7 +106,8 @@ function buildMetadataHtml(keys) {
     actions.closeLibrary();
   });
 
-  container.append(selectLabel, fieldset, preview, insert);
+  if (targets.length > 1) container.append(selectLabel);
+  container.append(fieldset, preview, insert);
   document.body.append(container);
   renderOptions();
 }());
