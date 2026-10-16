@@ -1,6 +1,20 @@
 # Your Project's Title...
 Your project's description...
 
+## Angular purchase journey PoC
+
+The EDS `pre-quote` and `purchase-path` blocks demonstrate a same-origin
+handoff into the hosted Angular purchase wizard, with shared DA-authored
+content. See [setup and authoring instructions](docs/purchase-journey.md).
+Local fixtures are in `drafts/car.html`, `drafts/purchase.html`, and
+`drafts/quote-content.plain.html`; DA publication is a separate step.
+
+Compare the standard collection-based `da-form` at
+http://localhost:3000/drafts/car-form with the JSON-driven `structured-pre-quote`
+at http://localhost:3000/drafts/car-structured. Both feed the same Angular wizard.
+The setup guide includes the spreadsheet CSV and actual DA schema-editor
+configuration; local fixtures are not a live authoring/publishing setup.
+
 ## Environments
 - Preview: https://main--{repo}--{owner}.aem.page/
 - Live: https://main--{repo}--{owner}.aem.live/

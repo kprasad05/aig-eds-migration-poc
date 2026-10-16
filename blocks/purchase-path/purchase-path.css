@@ -1,0 +1,23 @@
+.purchase-path quote-purchase {
+  display: block;
+}
+
+body.car-purchase-page > header,
+body.car-purchase-page > footer {
+  display: none;
+}
+
+body.car-purchase-page main > .section,
+body.car-purchase-page .purchase-path-wrapper {
+  margin: 0;
+  padding: 0;
+  max-width: none;
+}
+
+.purchase-path .journey-error {
+  padding: 16px;
+  border: 1px solid #db9c9c;
+  border-radius: 8px;
+  background: #fff1f1;
+  color: #8a2020;
+}
