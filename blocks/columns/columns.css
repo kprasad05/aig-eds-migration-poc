@@ -30,4 +30,12 @@
     flex: 1;
     order: unset;
   }
+
+  .columns.reverse > div {
+    flex-direction: row-reverse;
+  }
+
+  .columns.top-aligned > div {
+    align-items: flex-start;
+  }
 }

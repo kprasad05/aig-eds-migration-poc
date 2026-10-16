@@ -35,3 +35,7 @@
     padding: 40px 32px;
   }
 }
+
+.hero.short {
+  min-height: 160px;
+}

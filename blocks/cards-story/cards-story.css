@@ -113,6 +113,19 @@
     grid-template-columns: 1fr 1fr;
     gap: 24px 48px;
   }
+
+  .cards-story.single-column > ul {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cards-story.stacked > ul > li {
+  flex-direction: column;
+}
+
+.cards-story.stacked .cards-story-card-image,
+.cards-story.stacked .cards-story-card-image img {
+  width: 100%;
 }
 
 /* ---------------------------------------------------------------------------
