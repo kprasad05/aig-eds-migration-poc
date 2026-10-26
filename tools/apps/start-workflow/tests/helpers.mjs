@@ -22,7 +22,7 @@ export async function modules({ request, remote = {}, globals = {} } = {}) {
   const calls = [];
   const context = vm.createContext({
     crypto: webcrypto, TextEncoder, Uint8Array, Response, FormData, Blob,
-    URL, AbortSignal, DOMParser: class {
+    URL, URLSearchParams, AbortSignal, DOMParser: class {
       parseFromString(html) {
         return { querySelector: () => (html.includes('<main>') ? {} : null) };
       }
@@ -68,7 +68,12 @@ export async function modules({ request, remote = {}, globals = {} } = {}) {
   await workflow.evaluate();
   const api = await load(new URL('../api.js', import.meta.url));
   await api.evaluate();
-  return { model: model.namespace, workflow: workflow.namespace, api: api.namespace, calls };
+  const handoff = await load(new URL('../../request-publish-bulk/handoff.js', import.meta.url));
+  await handoff.evaluate();
+  return {
+    model: model.namespace, workflow: workflow.namespace, api: api.namespace,
+    handoff: handoff.namespace, calls,
+  };
 }
 
 export function json(value, { status = 200, headers = {} } = {}) {

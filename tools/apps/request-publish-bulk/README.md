@@ -23,6 +23,25 @@ https://da.live/app/kprasad05/aig-eds-migration-poc/tools/apps/request-publish-b
 create real requests and send emails. `env=ci` selects the CI Worker. Without
 an environment override, localhost expects a Worker at localhost:8787.
 
+## Importing reviewed translation destinations
+
+The Start Translation Workflow app can open this app with a `workflowHandoff`
+query parameter. The payload supplies version `1`, matching org/site, a workflow
+ID, and 1-50 unique French/German destination paths. Only canonical site-relative,
+extensionless paths are accepted. Malformed, wrong-site, duplicate or oversized
+payloads show an explicit error and do not populate the path field.
+
+Valid imports prefill the editable **Paste paths** field and show the workflow
+ID in an informational message. They do **not** automatically load projects,
+validate, preview, submit requests or publish. The user must perform the existing
+validation/preview/submission flow. Imported paths are not trusted proof of
+review or approval and do not bypass any backend rules.
+
+The launch link retains the source app's local/branch reference and selects the
+existing approval-service environment (`env=prod` by default, or `env=ci` when
+explicitly selected in the source URL). Production submissions can send real
+approval emails. This does not require a new local backend.
+
 ## Two input flows
 
 - **Paste paths:** enter one site-relative path or page URL per line.

@@ -4,6 +4,7 @@ import { LitElement, html, nothing } from 'da-lit';
 import createClient from './api.js';
 import { createProject } from './model.js';
 import { runProject } from './workflow.js';
+import { createWorkflowHandoffUrl } from '../request-publish-bulk/handoff.js';
 
 const STYLE = new URL('./start-workflow.css', import.meta.url).href;
 
@@ -22,6 +23,8 @@ class StartWorkflowApp extends LitElement {
     targetCodes: { state: true },
     title: { state: true },
     running: { state: true },
+    publishSelection: { state: true },
+    publishUrl: { state: true },
   };
 
   constructor() {
@@ -36,6 +39,8 @@ class StartWorkflowApp extends LitElement {
     this.message = null;
     this.title = 'Fragments translation POC';
     this.stopRequested = false;
+    this.publishSelection = new Set();
+    this.publishUrl = '';
     this.guardUnload = (event) => {
       event.preventDefault();
       event.returnValue = '';
@@ -86,6 +91,35 @@ class StartWorkflowApp extends LitElement {
     this.selected = selected;
   }
 
+  resetPublishSelection() {
+    this.publishSelection = new Set();
+    this.publishUrl = '';
+  }
+
+  selectForPublish(path, checked) {
+    try {
+      const eligible = new Set(this.project.workflow.items
+        .filter((item) => item.status === 'complete')
+        .map((item) => item.destination.replace(/\.html$/, '')));
+      if (!eligible.has(path)) throw new Error('Only confirmed saved destinations can be handed off.');
+      const selected = new Set(this.publishSelection);
+      if (checked) selected.add(path);
+      else selected.delete(path);
+      this.publishSelection = selected;
+      this.publishUrl = selected.size ? createWorkflowHandoffUrl({
+        org: this.org,
+        site: this.site,
+        workflowId: this.project.id,
+        paths: [...selected],
+        location: window.location,
+      }) : '';
+    } catch (error) {
+      this.publishUrl = '';
+      console.error('[Start Workflow] Publish handoff:', error.message);
+      this.message = { error: true, text: error.message };
+    }
+  }
+
   async openWizard() {
     this.message = null;
     await this.updateComplete;
@@ -97,6 +131,7 @@ class StartWorkflowApp extends LitElement {
       if (!navigator.locks) throw new Error('This POC requires a browser supporting the Web Locks API, such as current Chrome.');
       await navigator.locks.request(`da-workflow:${this.org}/${this.site}`, { ifAvailable: true }, async (lock) => {
         if (!lock) throw new Error('Another workflow is running in this browser for this site. Pause it first.');
+        this.resetPublishSelection();
         this.running = true;
         this.stopRequested = false;
         window.addEventListener('beforeunload', this.guardUnload);
@@ -143,6 +178,7 @@ class StartWorkflowApp extends LitElement {
   async retrieve(id) {
     await this.perform(async () => {
       this.project = await this.client.loadProject(id);
+      this.resetPublishSelection();
       this.message = { text: 'Saved progress loaded. Execution does not resume automatically. No content was written.' };
     });
   }
@@ -225,7 +261,8 @@ class StartWorkflowApp extends LitElement {
           <table>
             <caption>Per-page and target-language progress</caption>
             <thead><tr><th scope="col">Source → destination</th><th scope="col">Status</th>
-              <th scope="col">Attempts</th><th scope="col">Details</th></tr></thead>
+              <th scope="col">Attempts</th><th scope="col">Details</th>
+              <th scope="col">Review for publish request</th></tr></thead>
             <tbody>${items.map((item) => html`
               <tr>
                 <td><code>${item.source}</code><br>→ <code>${item.destination}</code></td>
@@ -236,8 +273,33 @@ class StartWorkflowApp extends LitElement {
                   <small>Source SHA-256: ${item.sourceHash.slice(0, 12)}...</small>
                   ${item.savedDate ? html`<small>Save verified: ${new Date(item.savedDate).toLocaleString()}</small>` : nothing}
                 </td>
+                <td>${item.status === 'complete' ? html`
+                  <a href=${`https://da.live/edit#/${this.org}/${this.site}${item.destination.replace(/\.html$/, '')}`}
+                    target="_blank" rel="noopener noreferrer"
+                    aria-label=${`Open ${item.destination} in DA`}>Open in DA</a>
+                  <label class="option">
+                    <input type="checkbox" ?disabled=${this.busy}
+                      .checked=${this.publishSelection.has(item.destination.replace(/\.html$/, ''))}
+                      aria-label=${`Reviewed and select ${item.destination}`}
+                      @change=${(event) => this.selectForPublish(item.destination.replace(/\.html$/, ''), event.target.checked)}>Reviewed
+                  </label>` : 'Available after a confirmed save.'}</td>
               </tr>`)}</tbody>
           </table>
+        </div>
+        <h3>Next: request publish approval</h3>
+        <p>Open each completed translation in DA, review it, then check Reviewed to select it.
+          Review selections are cleared when you reload or resume a workflow.
+          This is an author confirmation, not a formal review/sign-off gate.</p>
+        <p>Continue opens the existing publish-request app in a new tab with the selected paths.
+          It does not preview, submit requests, send emails, or publish automatically.
+          In that app, validate, explicitly preview where needed, then choose Request Publish.
+          Submitting requests uses the production approval service by default and can send real emails.</p>
+        <div class="actions">
+          ${this.publishUrl && !this.busy ? html`
+            <a class="primary" href=${this.publishUrl} target="_blank" rel="noopener noreferrer">
+              Continue to Publish Request (${this.publishSelection.size})
+            </a>` : html`
+            <button disabled>Continue to Publish Request (${this.publishSelection.size})</button>`}
         </div>
       </section>
     `;

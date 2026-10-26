@@ -15,7 +15,9 @@ It does **not** add a button to Adobe's content-browser toolbar.
 - **Foreground only. Keep the app open during execution.** Closing/navigating away
   stops execution. There is no queue, Worker, token storage, or unattended runner.
   A request already sent to a remote service may still finish after the app closes.
-- No regional rollout, source synchronization, preview, publish, or publish requests.
+- No regional rollout or source synchronization. This app does not preview,
+  publish, or submit publish requests itself; it can hand reviewed destinations
+  to the existing publish-request app.
 - Existing destinations require manual review and are not intentionally overwritten.
   Use new test source names whose corresponding target paths do not already exist.
 - Native translation project storage, plus app-specific task metadata. Native
@@ -75,10 +77,39 @@ Then open:
 https://da.live/app/kprasad05/aig-eds-migration-poc/tools/apps/start-workflow/start-workflow?ref=local&org=kprasad05&site=aig-eds-migration-poc
 ```
 
-The app can also be registered using the site's normal DA Apps configuration.
 No Prepare plugin or toolbar injection is required. Launch it through DA, not as
 a signed-out standalone site page. Local app code still operates on **real DA
 content** using your session; it is not a sandbox or dry-run.
+
+### Site apps tile
+
+DA's Apps landing page supports site-specific tiles through the site's DA
+configuration `apps` tab. This is separate from repository code deployment and
+from Adobe's built-in **For automators** cards.
+
+For this POC, **Start Translation Workflow** is registered in the
+`kprasad05/aig-eds-migration-poc` site configuration with `ref=poc-workflow`.
+Open:
+
+```text
+https://da.live/apps?ref=poc-workflow#/kprasad05/aig-eds-migration-poc
+```
+
+Find **Start Translation Workflow** under **Site apps** and choose **Go**.
+The tile launches the pushed `poc-workflow` app code, not local uncommitted code.
+Use the `ref=local` direct app URL above to test local changes.
+
+The configuration row has `title`, `description`, `image`, `path`, and `ref`
+fields. `path` is the complete DA app launch URL and `ref` is `poc-workflow`.
+An empty image uses DA's default card image. Existing app rows without a
+reference have the same behavior as `ref=main`.
+
+The plain `/apps` URL without a site hash does not show site-specific tiles.
+Branch-specific tiles are visible when the gallery's `ref` matches the row's
+reference (or the gallery uses its development filter). No merge to `main` is
+required for the branch tile. To promote it later, update both the configuration
+row's `ref` and its launch URL after the app code is available on the target
+branch. Do not change only one of them.
 
 ## Author flow
 
@@ -95,7 +126,68 @@ content** using your session; it is not a sandbox or dry-run.
    and never resumes automatically.
 7. **Resume / retry unfinished tasks** reloads persisted progress, skips confirmed
    saves, reconciles uncertain saves, and retries unfinished unblocked tasks.
-8. Review the translated documents in DA. Nothing is previewed or published.
+8. Use **Open in DA** on a completed destination to review the translated document.
+9. Check **Reviewed** for each completed destination to include in a publish
+   request, then choose **Continue to Publish Request (N)**.
+10. The bulk publish-request app opens in a new tab with just those paths prefilled.
+    Validate, explicitly preview missing/stale pages, add a comment as required,
+    then choose **Request Publish**. Merely opening the app does not validate,
+    preview, submit requests, send emails, or publish.
+
+## Publish-request handoff
+
+This reuses `../request-publish-bulk/` and the existing external approval Worker.
+Only confirmed saved destinations are selectable, including successful tasks from
+a partially failed translation project. French/German language-only paths are
+passed through the editable **Paste paths** flow; the existing project picker's
+language/country eligibility policy is unchanged.
+
+Review selections are local UI confirmations, cleared on project reload,
+retrieval, or resume. They are not persisted review records or a backend-enforced
+sign-off gate. Review any subsequent edits again before requesting approval.
+The receiving app treats imported data as untrusted editable input and still
+performs its normal source, preview-freshness, and duplicate-request checks.
+
+The DA launch link carries a bounded `workflowHandoff` query containing a version,
+org/site, workflow ID and at most 50 unique extensionless destination paths. It
+contains no tokens, source/translated content or credentials. The receiver rejects
+malformed, wrong-site, duplicate, non-target and oversized payloads. Overlong
+links require smaller batches; paths are never silently truncated. Workflow/path
+metadata will appear in the browser URL/history.
+
+The handoff preserves `ref=local` or the current branch reference. It explicitly
+selects `env=prod` by default so local frontend testing can use the existing
+deployed approval service instead of requiring a local Worker on port 8787.
+Opening the translator with `env=ci` carries that setting to the receiving app.
+**Submitting a request to production creates real request records and can send
+real approval emails.** Neither continuing nor validating sends approval emails.
+
+The existing approval infrastructure must be configured separately:
+
+- Worker available, authorized for the author, and able to send email.
+- DA `publish-workflow-config` rules covering the selected French/German paths.
+- Any distribution-list mappings and comment requirements configured.
+- Author write permission for the publish-requests sheet.
+- Approver access to the inbox and permission to publish the target content.
+
+The approver uses the existing email link/inbox and **Approve & Publish**. No
+approval rules or email templates were changed. Approval notifications and actual
+publishing remain tenant acceptance checks, not results of the mocked tests.
+
+### Local handoff acceptance test
+
+1. Run the local AEM CLI and open the `ref=local` translator URL above.
+2. Retrieve an already-completed workflow; no new translation run is necessary.
+3. Review one destination with **Open in DA**, then check its **Reviewed** box.
+4. Choose **Continue to Publish Request (1)**. Confirm the new app URL has
+   `ref=local&env=prod` and the correct org/site, and only the selected path is
+   prefilled. No request should yet exist.
+5. Click **Validate**. If a preview is missing/stale, select the page's preview
+   checkbox and use **Preview / refresh selected**, then confirm it is ready.
+6. Add a comment and explicitly choose **Request Publish** when ready to create a
+   real request/email.
+7. As the configured approver, open the notification/inbox, inspect the preview,
+   and approve/publish only if the test content is intended to go live.
 
 ## Execution and persistence
 
@@ -176,8 +268,8 @@ progress stops execution rather than continuing untracked writes. Language
 Run from the repository root:
 
 ```sh
-node --experimental-vm-modules --test tools/apps/start-workflow/tests/*.test.mjs
-npx eslint --no-ignore tools/apps/start-workflow/*.js
+node --experimental-vm-modules --test tools/apps/start-workflow/tests/*.test.mjs tools/apps/request-publish-bulk/tests/*.test.mjs
+npx eslint --no-ignore tools/apps/start-workflow/*.js tools/apps/request-publish-bulk/handoff.js tools/apps/request-publish-bulk/request-publish-bulk.js
 npx stylelint 'tools/apps/start-workflow/*.css'
 ```
 
