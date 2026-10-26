@@ -1,5 +1,8 @@
 # Forms POC: integration, authoring and submissions
 
+For a beginner-friendly authoring walkthrough of the current no-CAPTCHA example,
+see [Build the Contact Us form in DA](./contact-us-form-guide.md).
+
 ## Status and compatibility
 
 This repository is a vanilla EDS site using Document Authoring (DA), not an AEM
