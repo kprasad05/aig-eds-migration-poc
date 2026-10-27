@@ -28,7 +28,6 @@ class StartWorkflowApp extends LitElement {
     projects: { state: true },
     targetIds: { state: true },
     targetLocation: { state: true },
-    targetLocale: { state: true },
     overwriteConfirmed: { state: true },
     title: { state: true },
     running: { state: true },
@@ -43,7 +42,6 @@ class StartWorkflowApp extends LitElement {
     this.selected = new Set();
     this.targetIds = new Set();
     this.targetLocation = '';
-    this.targetLocale = '';
     this.overwriteConfirmed = false;
     this.projects = [];
     this.busy = false;
@@ -106,8 +104,18 @@ class StartWorkflowApp extends LitElement {
   resetTargets() {
     this.targetIds = new Set();
     this.targetLocation = '';
-    this.targetLocale = '';
     this.overwriteConfirmed = false;
+  }
+
+  selectTarget(id, checked) {
+    const ids = new Set(this.targetIds);
+    if (checked) ids.add(id);
+    else ids.delete(id);
+    this.targetIds = ids;
+  }
+
+  closeLocalePicker() {
+    this.renderRoot.querySelector('.locale-picker').open = false;
   }
 
   updatePublishHandoff() {
@@ -135,6 +143,7 @@ class StartWorkflowApp extends LitElement {
     this.message = null;
     this.overwriteConfirmed = false;
     await this.updateComplete;
+    this.closeLocalePicker();
     this.renderRoot.querySelector('dialog').showModal();
   }
 
@@ -202,6 +211,8 @@ class StartWorkflowApp extends LitElement {
     const targets = this.config?.targets || [];
     const locations = [...new Set(targets.map((target) => target.location))];
     const selectedTargets = targets.filter((target) => this.targetIds.has(target.id));
+    const regionalTargets = targets.filter((target) => target.location === this.targetLocation);
+    const regionalCount = regionalTargets.filter((target) => this.targetIds.has(target.id)).length;
     return html`
       <dialog aria-labelledby="wizard-title" @cancel=${(event) => {
     if (this.busy) event.preventDefault();
@@ -219,32 +230,43 @@ class StartWorkflowApp extends LitElement {
           <label for="target-location">Language / location</label>
             <select id="target-location" .value=${this.targetLocation} @change=${(event) => {
   this.targetLocation = event.target.value;
-  this.targetLocale = '';
+  this.closeLocalePicker();
 }}>
               <option value="">Choose a language / location</option>
               ${locations.map((location) => html`<option value=${location}>
                 ${location.slice(1)} — ${targets.find((target) => target.location === location).name.split(' - ')[0]}
               </option>`)}
             </select>
-          <label for="target-locale">Regional locale</label>
-            <select id="target-locale" .value=${this.targetLocale} ?disabled=${!this.targetLocation}
-              @change=${(event) => { this.targetLocale = event.target.value; }}>
-              <option value="">Choose a regional locale</option>
-              ${targets.filter((target) => target.location === this.targetLocation).map((target) => html`
-                <option value=${target.id} ?disabled=${this.targetIds.has(target.id)}>
+          <div id="target-locales-label">Regional locales</div>
+          <details class="locale-picker" @keydown=${(event) => {
+    if (event.key === 'Escape' && event.currentTarget.open) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.closeLocalePicker();
+      event.currentTarget.querySelector('summary').focus();
+    }
+  }}>
+            <summary aria-disabled=${this.busy || !this.targetLocation}
+              tabindex=${this.busy || !this.targetLocation ? -1 : 0}
+              @click=${(event) => {
+    if (this.busy || !this.targetLocation) event.preventDefault();
+  }}>${this.targetLocation
+  ? `Choose regional locales (${regionalCount} selected)` : 'Choose a language / location first'}</summary>
+            <div class="locale-options" role="group" aria-labelledby="target-locales-label">
+              ${regionalTargets.map((target) => html`
+                <label class="option">
+                  <input type="checkbox" value=${target.id} .checked=${this.targetIds.has(target.id)}
+                    @change=${(event) => this.selectTarget(target.id, event.target.checked)}>
                   ${target.locale.split('/')[2]} — ${target.name} (${target.locale})
-                </option>`)}
-            </select>
-          <button type="button" ?disabled=${!this.targetLocale || this.targetIds.has(this.targetLocale)}
-            @click=${() => {
-    this.targetIds = new Set([...this.targetIds, this.targetLocale]);
-    this.targetLocale = '';
-  }}>Add target locale</button>
+                </label>`)}
+            </div>
+          </details>
+          <p>Tick multiple locales to add them immediately; untick to remove.
+            Selections are kept when you switch languages.</p>
           <ul class="paths">${selectedTargets.map((target) => html`
             <li>${target.name}: <code>${target.locale}</code> — ${operationLabel(target)}
-              <button type="button" aria-label=${`Remove target ${target.locale}`} @click=${() => {
-  this.targetIds = new Set([...this.targetIds].filter((id) => id !== target.id));
-}}>Remove</button>
+              <button type="button" aria-label=${`Remove target ${target.locale}`}
+                @click=${() => this.selectTarget(target.id, false)}>Remove</button>
             </li>`)}</ul>
           <p>Targets come from the languages worksheet. English targets roll out without translation.
             Other languages roll out first, then translate. The /en language store itself is not a target.</p>

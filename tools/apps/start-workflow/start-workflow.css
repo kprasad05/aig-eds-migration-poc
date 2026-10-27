@@ -75,6 +75,41 @@
   padding: 8px 0;
 }
 
+.workflow-app .locale-picker {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 600px;
+  margin: 4px 0 12px;
+  border: 1px solid light-dark(#777, #aaa);
+  border-radius: 4px;
+  background: light-dark(#fff, #222);
+}
+
+.workflow-app .locale-picker summary {
+  cursor: pointer;
+  padding: 8px;
+}
+
+.workflow-app .locale-picker summary[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.workflow-app .locale-options {
+  max-height: 240px;
+  overflow-y: auto;
+  border-top: 1px solid light-dark(#ccc, #555);
+  padding: 0 12px;
+}
+
+.workflow-app .locale-options .option {
+  overflow-wrap: anywhere;
+}
+
+.workflow-app .locale-options input {
+  flex-shrink: 0;
+}
+
 .workflow-app .page-list,
 .workflow-app .paths,
 .workflow-app .history {

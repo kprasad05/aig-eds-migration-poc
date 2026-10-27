@@ -137,7 +137,11 @@ branch. Do not change only one of them.
 2. Check source pages. Selections persist across folder navigation. Review/remove
    entries in the selected list.
 3. Click **Start Workflow**, enter a title, choose a **Language / location**, then
-   a **Regional locale**, and click **Add target locale**. Repeat for other targets.
+   open **Regional locales** and tick multiple locales. Each checkbox immediately
+   adds/removes its target; no separate Add click or Ctrl/Command modifier is
+   required. Selections persist across language changes. The selected-target
+   list's **Remove** buttons also update the checkboxes. Press Escape to close
+   the locale dropdown, or Escape again to dismiss the wizard.
    Review every generated path and its **Rollout only** or **Rollout → Translate**
    operation. Acknowledge the overwrite warning. Cancel/Escape performs no writes.
 4. Choose **Create project and run**. Sources are read and fingerprinted before

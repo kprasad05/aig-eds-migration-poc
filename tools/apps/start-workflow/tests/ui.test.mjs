@@ -7,7 +7,9 @@ import { regionalSheets } from './helpers.mjs';
 const root = new URL('../../../../', import.meta.url);
 const appUrl = 'https://workflow.test/tools/apps/start-workflow/start-workflow.html?org=org&site=site&ref=local';
 
-async function browserFixture(t, { failGerman = false } = {}) {
+async function browserFixture(t, {
+  failGerman = false, translationConfig = regionalSheets(),
+} = {}) {
   const browser = await chromium.launch({ headless: true });
   t.after(() => browser.close());
   const context = await browser.newContext();
@@ -105,7 +107,7 @@ async function browserFixture(t, { failGerman = false } = {}) {
       }
       assert.ok(url.pathname.startsWith('/source/org/site/'));
       const path = url.pathname.slice('/source/org/site'.length);
-      if (path === '/.da/translate.json') return await respond(JSON.stringify(regionalSheets()));
+      if (path === '/.da/translate.json') return await respond(JSON.stringify(translationConfig));
       if (request.method() === 'POST') {
         const form = await new Request(url, {
           method: 'POST', headers: request.headers(), body: request.postDataBuffer(),
@@ -132,8 +134,10 @@ async function browserFixture(t, { failGerman = false } = {}) {
 
 async function addTarget(dialog, location, locale) {
   await dialog.getByLabel('Language / location', { exact: true }).selectOption(location);
-  await dialog.getByLabel('Regional locale', { exact: true }).selectOption(locale);
-  await dialog.getByRole('button', { name: 'Add target locale', exact: true }).click();
+  const summary = dialog.locator('.locale-picker summary');
+  await summary.click();
+  await dialog.getByRole('checkbox', { name: new RegExp(`\\(${locale}\\)$`) }).check();
+  await summary.click();
 }
 
 test('browser: multi-select, modal, real DOM status, partial failure, reload retrieval and idempotent retry', async (t) => {
@@ -213,7 +217,7 @@ test('browser: wizard cancellation, target removal and overwrite acknowledgement
   await f.page.getByLabel('/en/fragments/a.html', { exact: true }).check();
   await f.page.getByRole('button', { name: 'Start Workflow (1)', exact: true }).click();
   const dialog = f.page.getByRole('dialog');
-  await expect(dialog.getByLabel('Regional locale', { exact: true })).toBeDisabled();
+  await expect(dialog.locator('.locale-picker summary')).toHaveAttribute('aria-disabled', 'true');
   await addTarget(dialog, '/en', '/en/pr');
   await expect(dialog.getByRole('button', { name: 'Create project and run' })).toBeDisabled();
   await dialog.getByLabel('I understand that existing destination content will be overwritten.').check();
@@ -224,6 +228,93 @@ test('browser: wizard cancellation, target removal and overwrite acknowledgement
   await expect(f.page.getByRole('dialog')).not.toBeVisible();
   assert.equal(f.calls.translations, 0);
   assert.equal(f.projects.size, 0);
+  assert.deepEqual(f.calls.errors, []);
+});
+
+test('browser: locale dropdown supports multiple checks, language switching, removal and keyboard navigation', async (t) => {
+  const config = regionalSheets();
+  config.languages.data.push(
+    { name: 'English - Canada', code: 'en-ca', location: '/en', locales: '/en/ca', actions: 'Rollout' },
+    { name: 'English - South Africa', code: 'en-za', location: '/en', locales: '/en/za', actions: 'Rollout' },
+  );
+  const f = await browserFixture(t, { translationConfig: config });
+  await f.page.goto(appUrl);
+  await f.page.getByLabel('/en/fragments/a.html', { exact: true }).check();
+  await f.page.getByRole('button', { name: 'Start Workflow (1)', exact: true }).click();
+  const dialog = f.page.getByRole('dialog');
+  const picker = dialog.locator('.locale-picker');
+  const summary = picker.locator('summary');
+  await summary.click();
+  await expect(picker).toHaveJSProperty('open', false);
+  await dialog.getByLabel('Language / location', { exact: true }).selectOption('/en');
+  await summary.focus();
+  await f.page.keyboard.press('Enter');
+  await expect(picker).toHaveJSProperty('open', true);
+  const pr = picker.getByRole('checkbox', { name: 'pr — English - Puerto Rico (/en/pr)', exact: true });
+  const ca = picker.getByRole('checkbox', { name: 'ca — English - Canada (/en/ca)', exact: true });
+  const za = picker.getByRole('checkbox', { name: 'za — English - South Africa (/en/za)', exact: true });
+  await f.page.keyboard.press('Tab');
+  await expect(pr).toBeFocused();
+  await f.page.keyboard.press('Space');
+  await ca.check();
+  await za.check();
+  await expect(picker).toHaveJSProperty('open', true);
+  await expect(summary).toHaveText('Choose regional locales (3 selected)');
+  await expect(dialog.getByRole('button', { name: 'Add target locale', exact: true })).toHaveCount(0);
+  for (const locale of ['pr', 'ca', 'za']) {
+    await expect(dialog.getByText(`/en/${locale}/fragments/a.html`, { exact: true })).toBeVisible();
+  }
+  await ca.uncheck();
+  await expect(dialog.getByRole('button', { name: 'Remove target /en/ca', exact: true })).toHaveCount(0);
+  await expect(dialog.getByText('/en/ca/fragments/a.html', { exact: true })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Remove target /en/za', exact: true }).click();
+  await expect(za).not.toBeChecked();
+  await expect(summary).toHaveText('Choose regional locales (1 selected)');
+
+  await dialog.getByLabel('Language / location', { exact: true }).selectOption('/fr');
+  await expect(picker).toHaveJSProperty('open', false);
+  await summary.click();
+  await picker.getByRole('checkbox', { name: /\/fr\/fr/ }).check();
+  await picker.getByRole('checkbox', { name: /\/fr\/ca/ }).check();
+  await expect(summary).toHaveText('Choose regional locales (2 selected)');
+  await dialog.getByLabel('Language / location', { exact: true }).selectOption('/en');
+  await summary.click();
+  await expect(pr).toBeChecked();
+  await expect(ca).not.toBeChecked();
+  await expect(za).not.toBeChecked();
+  await ca.check();
+  await za.check();
+  await expect(dialog.getByRole('button', { name: /^Remove target / })).toHaveCount(5);
+  await expect(dialog.getByText('/fr/ca/fragments/a.html', { exact: true })).toBeVisible();
+
+  await pr.focus();
+  await f.page.keyboard.press('Escape');
+  await expect(picker).toHaveJSProperty('open', false);
+  await expect(summary).toBeFocused();
+  await expect(dialog).toBeVisible();
+  await f.page.keyboard.press('Space');
+  await expect(picker).toHaveJSProperty('open', true);
+  await f.page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await f.page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  await f.page.keyboard.press('Escape');
+  await f.page.keyboard.press('Escape');
+  await expect(dialog).not.toBeVisible();
+  assert.equal(f.calls.translations, 0);
+  assert.equal(f.calls.destinations, 0);
+  assert.equal(f.calls.approval, 0);
+  assert.equal(f.projects.size, 0);
+  await f.page.getByRole('button', { name: 'Start Workflow (1)', exact: true }).click();
+  await dialog.getByLabel('I understand that existing destination content will be overwritten.').check();
+  await dialog.getByRole('button', { name: 'Create project and run' }).click();
+  await expect(f.page.getByRole('status').filter({ hasText: '5/5 destinations saved' })).toBeVisible();
+  assert.equal(f.projects.size, 1);
+  const project = JSON.parse([...f.projects.values()][0]);
+  assert.deepEqual(project.workflow.items.map((item) => item.targetId).sort(),
+    ['/en/ca', '/en/pr', '/en/za', '/fr/ca', '/fr/fr']);
+  assert.equal(f.calls.translations, 2);
+  assert.equal(f.calls.destinations, 7);
+  assert.equal(f.calls.approval, 0);
+  await expect(f.page.getByRole('link', { name: 'Continue to Publish Request (5)', exact: true })).toBeVisible();
   assert.deepEqual(f.calls.errors, []);
 });
 
