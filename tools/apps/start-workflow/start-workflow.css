@@ -29,13 +29,15 @@
 }
 
 .workflow-app input,
+.workflow-app select,
 .workflow-app button {
   color: inherit;
   font: inherit;
   padding: 8px;
 }
 
-.workflow-app input:not([type="checkbox"]) {
+.workflow-app input:not([type="checkbox"]),
+.workflow-app select {
   box-sizing: border-box;
   display: block;
   width: 100%;

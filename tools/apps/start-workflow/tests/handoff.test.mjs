@@ -56,7 +56,7 @@ test('receiver rejects wrong site, traversal, arbitrary URLs, source paths, dupl
   const { handoff } = await modules();
   assert.equal(handoff.readWorkflowHandoff('?org=org&site=site', 'org', 'site'), null);
   for (const data of [
-    { ...payload, version: 2 },
+    { ...payload, version: 3 },
     { ...payload, org: 'other' },
     { ...payload, site: 'other' },
     { ...payload, workflowId: '../config' },
@@ -70,6 +70,36 @@ test('receiver rejects wrong site, traversal, arbitrary URLs, source paths, dupl
   }
   assert.throws(() => handoff.readWorkflowHandoff('?workflowHandoff=not-json', 'org', 'site'), /invalid JSON/);
   assert.throws(() => handoff.readWorkflowHandoff(`${search()}&workflowHandoff={}`, 'org', 'site'), /duplicate/);
+});
+
+test('regional v2 handoff accepts configured-locale-shaped English, Spanish and Chinese destinations', async () => {
+  const { handoff } = await modules();
+  const data = { ...payload, version: 2, paths: ['/en/pr/fragments/a', '/es/pr/fragments/a', '/zh/cn/fragments/a'] };
+  const url = new URL(handoff.createWorkflowHandoffUrl({
+    ...data, location: { hostname: 'localhost', search: '' },
+  }));
+  assert.equal(JSON.stringify(handoff.readWorkflowHandoff(url.search, 'org', 'site')), JSON.stringify(data));
+  for (const path of ['/en/a', '/.da/x/y', '/en/pr/a.html', '/en/../a']) {
+    assert.throws(() => handoff.readWorkflowHandoff(search({ ...data, paths: [path] }), 'org', 'site'), /Invalid/);
+  }
+});
+
+test('automatic handoff batching includes every completed path within count and encoded URL limits', async () => {
+  const { handoff } = await modules();
+  for (const paths of [
+    Array.from({ length: 125 }, (_, i) => `/es/pr/fragments/page-${i}`),
+    Array.from({ length: 30 }, (_, i) => `/en/pr/fragments/${'long-name-'.repeat(30)}${i}`),
+  ]) {
+    const batches = handoff.createWorkflowHandoffBatches({
+      ...payload, version: 2, paths, location: { hostname: 'localhost', search: '' },
+    });
+    const imported = Array.from(batches).flatMap(({ url, count }) => {
+      assert.ok(url.length <= 7000);
+      assert.ok(count <= 50);
+      return Array.from(handoff.readWorkflowHandoff(new URL(url).search, 'org', 'site').paths);
+    });
+    assert.deepEqual(imported, paths);
+  }
 });
 
 test('enforces the 50-path and bounded URL limits without silently dropping paths', async () => {

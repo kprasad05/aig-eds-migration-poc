@@ -2,7 +2,8 @@
 import { daFetch } from 'https://da.live/nx/utils/daFetch.js';
 import { validateSite } from '../request-publish-bulk/paths.js';
 import {
-  assertFolder, assertPage, parseConfig, projectPath, PROJECT_PREFIX, validateProject,
+  assertDestination, assertFolder, assertPage, parseConfig,
+  projectPath, PROJECT_PREFIX, validateProject,
 } from './model.js';
 
 const ADMIN = 'https://admin.da.live';
@@ -95,16 +96,26 @@ export default function createClient(org, site, token) {
       return read(path);
     },
     readDestination(path) {
-      if (!/^\/(?:fr|de)(?:\/[A-Za-z0-9_-]+)+\.html$/.test(path)) {
-        throw new Error('Invalid translation destination.');
-      }
+      assertDestination(path);
       return read(path);
     },
     async saveDestination(path, content) {
-      if (!/^\/(?:fr|de)(?:\/[A-Za-z0-9_-]+)+\.html$/.test(path)) {
-        throw new Error('Invalid translation destination.');
-      }
+      assertDestination(path);
       await write(path, content, 'text/html');
+    },
+    async prepareRollout(content) {
+      const document = new DOMParser().parseFromString(content, 'text/html');
+      const main = document.querySelector('main');
+      if (!main) throw new Error('Rollout source HTML is missing its main content.');
+      const { removeLocTags } = await import('https://da.live/nx/blocks/loc/regional-diff/regional-diff.js');
+      removeLocTags(document);
+      const metadata = document.querySelector('body > .da-metadata');
+      metadata?.querySelectorAll(':scope > div').forEach((row) => {
+        if (['acceptedhashes', 'rejectedhashes'].includes(row.firstElementChild?.textContent.trim().toLowerCase())) {
+          row.remove();
+        }
+      });
+      return `<body><header></header><main>${main.innerHTML}</main>${metadata?.outerHTML || ''}<footer></footer></body>`;
     },
     async saveProject(project) {
       validateProject(project, org, site);
@@ -128,7 +139,9 @@ export default function createClient(org, site, token) {
         }).sort((a, b) => b.modified - a.modified);
     },
     async translate(content, code, sheets) {
-      if (!['fr', 'de'].includes(code)) throw new Error('Unsupported target language.');
+      const configured = parseConfig(sheets).targets
+        .some((target) => target.translate && target.translationCode === code);
+      if (!configured) throw new Error('Unsupported target language in the current translation configuration.');
       // These native helpers preserve DA block names, icons, metadata and DNT rules.
       const { addDnt, removeDnt } = await import('https://da.live/nx/blocks/loc/dnt/dnt.js');
       const prepared = await addDnt(content, sheets, { fileType: 'html' });

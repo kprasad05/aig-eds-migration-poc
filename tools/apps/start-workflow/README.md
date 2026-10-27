@@ -1,25 +1,35 @@
 # Start Translation Workflow — interactive POC
 
-A standalone DA app for selecting multiple pages/fragments, choosing French
-and/or German, creating a translation project, calling the configured Google
-connector, saving translated HTML, and retrieving per-page progress later.
+A standalone DA app for selecting multiple English pages/fragments, choosing
+language locations and regional locales from the translation configuration,
+rolling out with overwrite, translating where needed, and retrieving per-stage
+progress later. Successfully saved destinations can be passed to the existing
+publish-request app with an explicit **Continue to Publish Request** click.
 It does **not** add a button to Adobe's content-browser toolbar.
 
 ## Agreed scope
 
 - Uses the author's existing DA SDK session, in memory only.
-- English `/en` → French `/fr` and German `/de`; initially browse `/en/fragments`.
-  Thus `/en/fragments/example.html` maps to `/fr/fragments/example.html` and
-  `/de/fragments/example.html`. Other HTML pages under `/en` are also selectable.
+- English `/en` sources; initially browse `/en/fragments`. Choose a language
+  `location`, then one of its configured `locales`, and add multiple targets to
+  one workflow. `/en/fragments/example.html` maps to
+  `/en/pr/fragments/example.html` for English/Puerto Rico (rollout only), or
+  `/es/pr/fragments/example.html` for Spanish/Puerto Rico
+  (rollout, then translate, then save).
 - At most 25 selected source pages per project. Folder selection is not recursive.
 - **Foreground only. Keep the app open during execution.** Closing/navigating away
   stops execution. There is no queue, Worker, token storage, or unattended runner.
   A request already sent to a remote service may still finish after the app closes.
-- No regional rollout or source synchronization. This app does not preview,
-  publish, or submit publish requests itself; it can hand reviewed destinations
-  to the existing publish-request app.
-- Existing destinations require manual review and are not intentionally overwritten.
-  Use new test source names whose corresponding target paths do not already exist.
+- This app does not preview, publish, or submit publish requests itself.
+- **New locale workflows overwrite existing destination content, including local
+  edits and earlier translations.** The wizard shows the generated paths, the
+  operations, a warning, and a required overwrite acknowledgement. There is no
+  merge or backup/restore feature. The `/en` language store is not a target, and
+  a destination cannot overwrite a selected source.
+- A different-language destination temporarily contains the English rollout
+  copy. If translation fails, that copy remains, but the task is not complete
+  and is excluded from the publish-request handoff. Review any existing pending
+  publish requests for overwritten paths separately.
 - Native translation project storage, plus app-specific task metadata. Native
   dashboard compatibility and tenant execution still require validation.
 
@@ -43,12 +53,22 @@ necessary for unattended execution.
    | translation.service.name | Google |
    | source.language | English |
 
-4. `languages` includes English (`code=en`, `location=/en`), and French
-   (`code=fr`, `location=/fr`) and/or German (`code=de`, `location=/de`) with
-   `Translate` in their comma-separated `actions`. The English language row's
-   `name` must match `source.language`. Targets with a different `source language`
-   dependency or different destination folders are not offered by this POC.
-   Unavailable targets are not invented or added to the site's configuration.
+4. `languages` includes English (`code=en`, `location=/en`); its `name` must match
+   `source.language`. Each row has `name`, `code`, `location`, comma-separated
+   `locales`, and `actions`. English regional rows need `Rollout`; other language
+   rows need `Translate`. Rows depending on a different `source` (or legacy
+   `source language`) are not offered.
+   - Example: English - Puerto Rico, `en-pr`, `/en`, `/en/pr`.
+   - Example: Spanish - Puerto Rico, `es`, `/es`, `/es/pr`.
+   - Only canonical two-segment regional locales are supported. Language-store
+     entries such as `/en` are omitted. Duplicate locale definitions and
+     malformed rows produce explicit errors.
+   - `location` and the locale's language prefix can differ, for example
+     `/zh-hans` with `/zh/cn`. Always use the configured locale destination.
+   - Regional row codes are retained, but Google uses the location's base
+     language code when present (French `fr`, not regional `fr-ca`).
+     Otherwise it uses the first row's code for that location, preserving codes
+     such as `zh-CN` and `zh-TW`. Provider support still requires tenant validation.
 5. Google translation is configured and authorized for this DA org/site.
    Translation may incur provider charges.
 6. A current browser with native dialogs, Web Crypto and Web Locks, such as Chrome.
@@ -116,20 +136,24 @@ branch. Do not change only one of them.
 1. Browse `/en/fragments` or another `/en` folder.
 2. Check source pages. Selections persist across folder navigation. Review/remove
    entries in the selected list.
-3. Click **Start Workflow**, enter a title, select configured targets, and review
-   every generated destination. Cancel/Escape performs no translation or writes.
+3. Click **Start Workflow**, enter a title, choose a **Language / location**, then
+   a **Regional locale**, and click **Add target locale**. Repeat for other targets.
+   Review every generated path and its **Rollout only** or **Rollout → Translate**
+   operation. Acknowledge the overwrite warning. Cancel/Escape performs no writes.
 4. Choose **Create project and run**. Sources are read and fingerprinted before
    project creation. Keep the app open.
 5. Review per-page status, attempts and errors. **Pause after current task** waits
    for the current task and its checkpoint before stopping.
 6. After reopening, choose a saved workflow or enter its ID. Loading is read-only
    and never resumes automatically.
-7. **Resume / retry unfinished tasks** reloads persisted progress, skips confirmed
-   saves, reconciles uncertain saves, and retries unfinished unblocked tasks.
+7. **Resume / retry unfinished tasks** reloads persisted progress, skips completed
+   tasks, reconciles uncertain rollout/final saves, and retries unfinished
+   unblocked tasks. A confirmed unchanged rollout is not repeated just because
+   translation failed.
 8. Use **Open in DA** on a completed destination to review the translated document.
-9. Check **Reviewed** for each completed destination to include in a publish
-   request, then choose **Continue to Publish Request (N)**.
-10. The bulk publish-request app opens in a new tab with just those paths prefilled.
+9. Completed, confirmed-saved destinations are automatically included; there are
+   no **Reviewed** checkboxes. Choose **Continue to Publish Request (N)**.
+10. The bulk publish-request app opens in a new tab with those paths prefilled.
     Validate, explicitly preview missing/stale pages, add a comment as required,
     then choose **Request Publish**. Merely opening the app does not validate,
     preview, submit requests, send emails, or publish.
@@ -137,22 +161,25 @@ branch. Do not change only one of them.
 ## Publish-request handoff
 
 This reuses `../request-publish-bulk/` and the existing external approval Worker.
-Only confirmed saved destinations are selectable, including successful tasks from
-a partially failed translation project. French/German language-only paths are
-passed through the editable **Paste paths** flow; the existing project picker's
-language/country eligibility policy is unchanged.
+Only successfully processed, confirmed-saved destinations are included, including
+successful tasks from a partially failed project. This works after saved-progress
+retrieval as well. The editable **Paste paths** flow is used; the existing
+project picker's language/country eligibility policy is unchanged.
 
-Review selections are local UI confirmations, cleared on project reload,
-retrieval, or resume. They are not persisted review records or a backend-enforced
-sign-off gate. Review any subsequent edits again before requesting approval.
+Continuing is not a persisted review/sign-off record. Review content in DA or
+in the approver inbox, and review subsequent edits again before approval.
 The receiving app treats imported data as untrusted editable input and still
 performs its normal source, preview-freshness, and duplicate-request checks.
 
 The DA launch link carries a bounded `workflowHandoff` query containing a version,
-org/site, workflow ID and at most 50 unique extensionless destination paths. It
+org/site, workflow ID and at most 50 unique extensionless destination paths per
+batch. Version 2 supports regional destinations for all configured languages;
+version 1 remains supported for earlier French/German language-store projects. It
 contains no tokens, source/translated content or credentials. The receiver rejects
-malformed, wrong-site, duplicate, non-target and oversized payloads. Overlong
-links require smaller batches; paths are never silently truncated. Workflow/path
+malformed, wrong-site, duplicate, noncanonical and oversized payloads. Large
+workflows automatically get multiple numbered continuation links, each bounded
+by the 50-path and 7000-character encoded URL limits. Open each batch; no paths
+are silently truncated. Workflow/path
 metadata will appear in the browser URL/history.
 
 The handoff preserves `ref=local` or the current branch reference. It explicitly
@@ -165,7 +192,7 @@ real approval emails.** Neither continuing nor validating sends approval emails.
 The existing approval infrastructure must be configured separately:
 
 - Worker available, authorized for the author, and able to send email.
-- DA `publish-workflow-config` rules covering the selected French/German paths.
+- DA `publish-workflow-config` rules covering the selected regional paths.
 - Any distribution-list mappings and comment requirements configured.
 - Author write permission for the publish-requests sheet.
 - Approver access to the inbox and permission to publish the target content.
@@ -178,10 +205,11 @@ publishing remain tenant acceptance checks, not results of the mocked tests.
 
 1. Run the local AEM CLI and open the `ref=local` translator URL above.
 2. Retrieve an already-completed workflow; no new translation run is necessary.
-3. Review one destination with **Open in DA**, then check its **Reviewed** box.
-4. Choose **Continue to Publish Request (1)**. Confirm the new app URL has
-   `ref=local&env=prod` and the correct org/site, and only the selected path is
-   prefilled. No request should yet exist.
+3. Optionally inspect destinations with **Open in DA**. All completed destinations
+   are included without individual checkboxes; failed tasks are excluded.
+4. Choose **Continue to Publish Request (N)**. Confirm the new app URL has
+   `ref=local&env=prod` and the correct org/site, and all completed paths in that
+   batch are prefilled. Continuing must not create requests or send emails.
 5. Click **Validate**. If a preview is missing/stale, select the page's preview
    checkbox and use **Preview / refresh selected**, then confirm it is ready.
 6. Add a comment and explicitly choose **Request Publish** when ready to create a
@@ -200,7 +228,11 @@ continuation tokens. Project files are stored at:
 
 Each project includes native-style `org`, `site`, `title`, `urls`, `langs`,
 `options`, `view`, dates, and language translation counts, plus a `workflow`
-namespace with `mode=interactive-google-v1` and per-source/per-target tasks.
+namespace with `mode=interactive-google-locales-v2` and per-source/per-locale
+tasks. Each locale has its own identity, even when it shares a provider language
+with another locale. Earlier `interactive-google-v1` projects remain readable
+and retryable with their original no-overwrite behaviour; they are not silently
+migrated to overwrite workflows.
 The UUID is the app/native project identifier. Google is called synchronously;
 there is no separate provider job ID or provider status polling endpoint here.
 No source/translated HTML, session tokens, or credentials are persisted in
@@ -210,7 +242,7 @@ The adapter calls:
 
 ```text
 POST https://translate.da.live/translate/google/{org}/{site}
-multipart: data=<HTML>, fromlang=en, tolang=fr|de
+multipart: data=<HTML>, fromlang=en, tolang=<configured base language code>
 ```
 
 It reuses native DA `addDnt`/`removeDnt` and Google HTML split/rejoin helpers so
@@ -219,20 +251,35 @@ the native path. Each chunk and HTTP response is checked. Destination HTML is
 saved with DA Source multipart `data`. A translation response alone does **not**
 count as a confirmed save.
 
+### Overwrite rollout adapter
+
+Native overwrite rollout was checked against `nx/blocks/loc/project/index.js`
+at `adobe/da-nx` revision `f0c63255bc8ce34f79d6908d98351bb3d426e927`.
+Its overwrite path writes to DA Source; there is no separate generic rollout
+REST endpoint. This app prepares a copy using native `removeLocTags`, carries
+the main content and DA metadata, clears accepted/rejected regional-diff hashes,
+and writes with the same multipart Source mechanism. The app checkpoints and
+confirms each write itself rather than using native frontend/global project
+state. It does not merge regional changes, generate regional diffs, or create
+native named rollout versions.
+
 ### Task states and retries
 
 | State | Meaning |
 | --- | --- |
 | queued | Not executed yet |
+| rolling-out | Overwrite copy in progress; inspect rolloutStatus after interruption |
 | translating | Provider operation in progress, or interrupted if app closed |
 | saving | Output hash checkpoint saved; destination save may be in flight |
 | complete | Destination was read back and matched the expected output SHA-256 |
 | failed | Source/provider/read failure; eligible for explicit retry |
 | save-unconfirmed | Save response/readback uncertain; retry checks destination first |
-| needs-review | Source revision changed or destination exists/differs; blocked |
+| needs-review | Source revision changed; blocked. Legacy v1 also blocks existing/different destinations |
 
 The project persists source SHA-256, configuration SHA-256, output SHA-256 before
-save, attempts, errors, and verified-save timestamps. A retry that finds matching
+save, separate rollout SHA-256/status, attempts, errors, and verified-save timestamps.
+A task is complete only after its final required stage is confirmed saved.
+A retry that finds matching
 output completes the task without another write or translation. Missing output
 may require another Google request and additional charges. A changed source or
 configuration requires a new project; existing workflow inputs are not silently
@@ -248,10 +295,9 @@ progress stops execution rather than continuing untracked writes. Language
 - Web Locks prevent two app instances in the same browser/origin running for
   the same site simultaneously. This is **not** a cross-device or cross-origin
   distributed lock.
-- Destination existence is checked before translation and immediately before
-  save; the source fingerprint is rechecked before saving. A remote edit can
-  still race between the final read and the DA write: an atomic conditional
-  create/lock contract has not been verified. **Use isolated test paths and do not
+- New locale workflows intentionally overwrite destinations, and recheck the
+  pinned source before writes. An atomic conditional write/lock contract has
+  not been verified. **Use isolated test paths and do not
   edit them or execute another client against them during a run.** This POC is
   not safe for concurrent production writers.
 - Do not run, edit, archive, or resave these projects through native Translate

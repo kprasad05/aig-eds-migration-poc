@@ -9,13 +9,24 @@ export function sheets() {
       { key: 'source.language', value: 'English' },
     ] },
     languages: { data: [
-      { name: 'English', code: 'en', location: '/en', actions: 'Skip' },
-      { name: 'French', code: 'fr', location: '/fr', actions: 'Skip, Translate' },
-      { name: 'German', code: 'de', location: '/de', actions: 'Translate' },
+      { name: 'English', code: 'en', location: '/en', locales: '/en', actions: 'Skip' },
+      { name: 'French', code: 'fr', location: '/fr', locales: '/fr/fr', actions: 'Skip, Translate' },
+      { name: 'German', code: 'de', location: '/de', locales: '/de/de', actions: 'Translate' },
     ] },
     'custom-doc-rules': { data: [] },
     'dnt-content-rules': { data: [] },
   };
+}
+
+export function regionalSheets() {
+  const config = sheets();
+  config.languages.data.push(
+    { name: 'English - Puerto Rico', code: 'en-pr', location: '/en', locales: '/en/pr', actions: 'Skip, Translate, Rollout' },
+    { name: 'Spanish - Puerto Rico', code: 'es', location: '/es', locales: '/es/pr', actions: 'Skip, Translate' },
+    { name: 'French - Canada', code: 'fr-ca', location: '/fr', locales: '/fr/ca', actions: 'Translate' },
+    { name: 'Chinese - China', code: 'zh-CN', location: '/zh-hans', locales: '/zh/cn', actions: 'Translate' },
+  );
+  return config;
 }
 
 export async function modules({ request, remote = {}, globals = {} } = {}) {

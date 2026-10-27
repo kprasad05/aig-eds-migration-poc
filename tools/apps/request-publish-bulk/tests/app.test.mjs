@@ -117,6 +117,20 @@ test('workflow handoff only prefills editable paths; preview and submission rema
   assert.equal(previews.length, 0);
 });
 
+test('regional workflow v2 imports English and Spanish locale paths without preview or submission', async () => {
+  const { app, requests, previews } = await createApp({}, handoffSearch({
+    ...workflowHandoff, version: 2, paths: ['/en/pr/fragments/a', '/es/pr/fragments/a'],
+  }));
+  app.loadWorkflowHandoff();
+  assert.equal(app._pathsText, '/en/pr/fragments/a\n/es/pr/fragments/a');
+  assert.equal(requests.length, 0);
+  assert.equal(previews.length, 0);
+  await app.handleValidate();
+  assert.equal(app._submittable.length, 2);
+  assert.equal(requests.length, 0);
+  assert.equal(previews.length, 0);
+});
+
 test('rejects wrong-site/malformed handoff with an explicit error and no preview/submission', async () => {
   for (const search of [
     handoffSearch({ ...workflowHandoff, site: 'other' }),

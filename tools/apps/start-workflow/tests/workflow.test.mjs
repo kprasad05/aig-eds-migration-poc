@@ -42,9 +42,12 @@ test('validates actual configured source, provider, targets, actions and chained
   assert.throws(() => model.parseConfig(provider), /Google/);
   const config = sheets();
   config.languages.data[1].location = '/fr/ca';
+  assert.throws(() => model.parseConfig(config), /Invalid language configuration/);
+  config.languages.data[1].location = '/fr';
+  config.languages.data[1].actions = 'Skip';
   assert.deepEqual(Array.from(model.parseConfig(config).targets, (lang) => lang.code), ['de']);
   config.languages.data[2]['source language'] = 'French';
-  assert.throws(() => model.parseConfig(config), /Configure French/);
+  assert.throws(() => model.parseConfig(config), /Configure regional locales/);
 });
 
 test('creates a native-shaped project, deduplicates pages and fingerprints source revisions', async () => {

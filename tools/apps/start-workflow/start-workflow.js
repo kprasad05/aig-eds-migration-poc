@@ -2,11 +2,17 @@
 import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 import { LitElement, html, nothing } from 'da-lit';
 import createClient from './api.js';
-import { createProject } from './model.js';
+import { createProject, LOCALE_MODE, operationLabel } from './model.js';
 import { runProject } from './workflow.js';
-import { createWorkflowHandoffUrl } from '../request-publish-bulk/handoff.js';
+import { createWorkflowHandoffBatches } from '../request-publish-bulk/handoff.js';
 
 const STYLE = new URL('./start-workflow.css', import.meta.url).href;
+
+function translationStatus(item) {
+  if (!item.translate) return 'not required (same language)';
+  if (item.status === 'complete') return 'saved';
+  return item.status === 'translating' ? 'in progress' : 'not yet saved';
+}
 
 class StartWorkflowApp extends LitElement {
   static properties = {
@@ -20,11 +26,14 @@ class StartWorkflowApp extends LitElement {
     message: { state: true },
     project: { state: true },
     projects: { state: true },
-    targetCodes: { state: true },
+    targetIds: { state: true },
+    targetLocation: { state: true },
+    targetLocale: { state: true },
+    overwriteConfirmed: { state: true },
     title: { state: true },
     running: { state: true },
-    publishSelection: { state: true },
-    publishUrl: { state: true },
+    publishBatches: { state: true },
+    publishError: { state: true },
   };
 
   constructor() {
@@ -32,15 +41,18 @@ class StartWorkflowApp extends LitElement {
     this.folder = '/en/fragments';
     this.pages = [];
     this.selected = new Set();
-    this.targetCodes = new Set();
+    this.targetIds = new Set();
+    this.targetLocation = '';
+    this.targetLocale = '';
+    this.overwriteConfirmed = false;
     this.projects = [];
     this.busy = false;
     this.running = false;
     this.message = null;
     this.title = 'Fragments translation POC';
     this.stopRequested = false;
-    this.publishSelection = new Set();
-    this.publishUrl = '';
+    this.publishBatches = [];
+    this.publishError = '';
     this.guardUnload = (event) => {
       event.preventDefault();
       event.returnValue = '';
@@ -70,7 +82,7 @@ class StartWorkflowApp extends LitElement {
     await this.perform(async () => {
       this.client = createClient(this.org, this.site, token);
       this.config = await this.client.loadConfig();
-      this.targetCodes = new Set(this.config.targets.map((target) => target.code));
+      this.resetTargets();
       this.pages = await this.client.listPages(this.folder);
       this.projects = await this.client.listProjects();
     });
@@ -91,47 +103,49 @@ class StartWorkflowApp extends LitElement {
     this.selected = selected;
   }
 
-  resetPublishSelection() {
-    this.publishSelection = new Set();
-    this.publishUrl = '';
+  resetTargets() {
+    this.targetIds = new Set();
+    this.targetLocation = '';
+    this.targetLocale = '';
+    this.overwriteConfirmed = false;
   }
 
-  selectForPublish(path, checked) {
+  updatePublishHandoff() {
+    this.publishBatches = [];
+    this.publishError = '';
     try {
-      const eligible = new Set(this.project.workflow.items
+      const paths = [...new Set(this.project.workflow.items
         .filter((item) => item.status === 'complete')
-        .map((item) => item.destination.replace(/\.html$/, '')));
-      if (!eligible.has(path)) throw new Error('Only confirmed saved destinations can be handed off.');
-      const selected = new Set(this.publishSelection);
-      if (checked) selected.add(path);
-      else selected.delete(path);
-      this.publishSelection = selected;
-      this.publishUrl = selected.size ? createWorkflowHandoffUrl({
+        .map((item) => item.destination.replace(/\.html$/, '')))];
+      this.publishBatches = paths.length ? createWorkflowHandoffBatches({
         org: this.org,
         site: this.site,
         workflowId: this.project.id,
-        paths: [...selected],
+        paths,
+        version: this.project.workflow.mode === LOCALE_MODE ? 2 : 1,
         location: window.location,
-      }) : '';
+      }) : [];
     } catch (error) {
-      this.publishUrl = '';
       console.error('[Start Workflow] Publish handoff:', error.message);
-      this.message = { error: true, text: error.message };
+      this.publishError = error.message;
     }
   }
 
   async openWizard() {
     this.message = null;
+    this.overwriteConfirmed = false;
     await this.updateComplete;
     this.renderRoot.querySelector('dialog').showModal();
   }
 
   async execute(isNew) {
     await this.perform(async () => {
+      if (isNew && !this.overwriteConfirmed) throw new Error('Confirm that existing destination content will be overwritten.');
       if (!navigator.locks) throw new Error('This POC requires a browser supporting the Web Locks API, such as current Chrome.');
       await navigator.locks.request(`da-workflow:${this.org}/${this.site}`, { ifAvailable: true }, async (lock) => {
         if (!lock) throw new Error('Another workflow is running in this browser for this site. Pause it first.');
-        this.resetPublishSelection();
+        this.publishBatches = [];
+        this.publishError = '';
         this.running = true;
         this.stopRequested = false;
         window.addEventListener('beforeunload', this.guardUnload);
@@ -143,7 +157,7 @@ class StartWorkflowApp extends LitElement {
               site: this.site,
               title: this.title,
               paths: [...this.selected],
-              codes: [...this.targetCodes],
+              targetIds: [...this.targetIds],
               config: this.config,
               readSource: this.client.readSource,
             });
@@ -164,11 +178,12 @@ class StartWorkflowApp extends LitElement {
           this.message = {
             error: !complete && !this.stopRequested,
             text: complete
-              ? 'All translations were saved. Human review is required. Nothing was previewed or published.'
+              ? 'All destinations were saved. Continue to Publish Request when ready. Nothing was previewed or published.'
               : 'Execution stopped. Progress is saved in DA. Review task details; resume retries only unfinished, unblocked tasks.',
           };
         } finally {
           this.running = false;
+          if (this.project) this.updatePublishHandoff();
           window.removeEventListener('beforeunload', this.guardUnload);
         }
       });
@@ -178,12 +193,15 @@ class StartWorkflowApp extends LitElement {
   async retrieve(id) {
     await this.perform(async () => {
       this.project = await this.client.loadProject(id);
-      this.resetPublishSelection();
+      this.updatePublishHandoff();
       this.message = { text: 'Saved progress loaded. Execution does not resume automatically. No content was written.' };
     });
   }
 
   renderWizard() {
+    const targets = this.config?.targets || [];
+    const locations = [...new Set(targets.map((target) => target.location))];
+    const selectedTargets = targets.filter((target) => this.targetIds.has(target.id));
     return html`
       <dialog aria-labelledby="wizard-title" @cancel=${(event) => {
     if (this.busy) event.preventDefault();
@@ -197,36 +215,64 @@ class StartWorkflowApp extends LitElement {
           </label>
         </fieldset>
         <fieldset ?disabled=${this.busy}>
-          <legend>2. Choose target languages</legend>
-          ${(this.config?.targets || []).map((target) => html`
-            <label class="option">
-              <input type="checkbox" .checked=${this.targetCodes.has(target.code)}
-                @change=${(event) => {
-    const codes = new Set(this.targetCodes);
-    if (event.target.checked) codes.add(target.code);
-    else codes.delete(target.code);
-    this.targetCodes = codes;
-  }}>
-              ${target.name}: ${target.location}
-            </label>`)}
-          <p>Only targets supported by your existing DA translation configuration are available.</p>
+          <legend>2. Choose target languages and locales</legend>
+          <label for="target-location">Language / location</label>
+            <select id="target-location" .value=${this.targetLocation} @change=${(event) => {
+  this.targetLocation = event.target.value;
+  this.targetLocale = '';
+}}>
+              <option value="">Choose a language / location</option>
+              ${locations.map((location) => html`<option value=${location}>
+                ${location.slice(1)} — ${targets.find((target) => target.location === location).name.split(' - ')[0]}
+              </option>`)}
+            </select>
+          <label for="target-locale">Regional locale</label>
+            <select id="target-locale" .value=${this.targetLocale} ?disabled=${!this.targetLocation}
+              @change=${(event) => { this.targetLocale = event.target.value; }}>
+              <option value="">Choose a regional locale</option>
+              ${targets.filter((target) => target.location === this.targetLocation).map((target) => html`
+                <option value=${target.id} ?disabled=${this.targetIds.has(target.id)}>
+                  ${target.locale.split('/')[2]} — ${target.name} (${target.locale})
+                </option>`)}
+            </select>
+          <button type="button" ?disabled=${!this.targetLocale || this.targetIds.has(this.targetLocale)}
+            @click=${() => {
+    this.targetIds = new Set([...this.targetIds, this.targetLocale]);
+    this.targetLocale = '';
+  }}>Add target locale</button>
+          <ul class="paths">${selectedTargets.map((target) => html`
+            <li>${target.name}: <code>${target.locale}</code> — ${operationLabel(target)}
+              <button type="button" aria-label=${`Remove target ${target.locale}`} @click=${() => {
+  this.targetIds = new Set([...this.targetIds].filter((id) => id !== target.id));
+}}>Remove</button>
+            </li>`)}</ul>
+          <p>Targets come from the languages worksheet. English targets roll out without translation.
+            Other languages roll out first, then translate. The /en language store itself is not a target.</p>
         </fieldset>
         <h3>3. Review destination paths</h3>
         <ul class="paths">
-          ${[...this.selected].flatMap((path) => (this.config?.targets || [])
-    .filter((target) => this.targetCodes.has(target.code))
-    .map((target) => html`<li><code>${path}</code> → <code>${target.location}${path.slice(3)}</code></li>`))}
+          ${[...this.selected].flatMap((path) => selectedTargets
+    .map((target) => html`<li><code>${path}</code> → <code>${target.locale}${path.slice(3)}</code>
+      — ${operationLabel(target)}</li>`))}
         </ul>
-        <p role="note">Google translation may incur charges. Keep the app open. Existing destinations
-          are blocked, not replaced. No regional rollout, preview, or publishing is performed.
-          This POC's existence check is not an atomic lock: do not edit destinations or run
-          another client against these paths during execution.</p>
+        <p class="error" role="note"><strong>Warning: existing destination content will be overwritten.</strong>
+          This includes local edits and previous translations at the selected destination paths.
+          Missing destinations will be created. Nothing will be published automatically.</p>
+        <label class="option">
+          <input type="checkbox" .checked=${this.overwriteConfirmed} ?disabled=${this.busy}
+            @change=${(event) => { this.overwriteConfirmed = event.target.checked; }}>
+          I understand that existing destination content will be overwritten.
+        </label>
+        <p role="note">Google translation may incur charges. Keep the app open. A different-language
+          destination contains the source-language copy until translation is successfully saved.
+          Failed or unfinished tasks are excluded from publish requests. Do not edit destinations
+          or run another client against these paths during execution.</p>
         ${this.message?.error ? html`<p class="error" role="alert">${this.message.text}</p>` : nothing}
         <div class="actions">
           <button type="button" ?disabled=${this.busy}
             @click=${() => this.renderRoot.querySelector('dialog').close()}>Cancel</button>
           <button type="button" class="primary"
-            ?disabled=${this.busy || !this.title.trim() || !this.targetCodes.size}
+            ?disabled=${this.busy || !this.title.trim() || !this.targetIds.size || !this.overwriteConfirmed}
             @click=${() => this.execute(true)}>${this.busy ? 'Starting...' : 'Create project and run'}</button>
         </div>
       </dialog>
@@ -261,15 +307,18 @@ class StartWorkflowApp extends LitElement {
           <table>
             <caption>Per-page and target-language progress</caption>
             <thead><tr><th scope="col">Source → destination</th><th scope="col">Status</th>
-              <th scope="col">Attempts</th><th scope="col">Details</th>
-              <th scope="col">Review for publish request</th></tr></thead>
+              <th scope="col">Attempts</th><th scope="col">Stages and details</th>
+              <th scope="col">Destination</th></tr></thead>
             <tbody>${items.map((item) => html`
               <tr>
                 <td><code>${item.source}</code><br>→ <code>${item.destination}</code></td>
-                <td>${!this.running && ['translating', 'saving'].includes(item.status)
+                <td>${!this.running && ['rolling-out', 'translating', 'saving'].includes(item.status)
     ? `${item.status} (interrupted; retry to reconcile)` : item.status}</td>
                 <td>${item.attempts}</td>
                 <td>${item.error || (item.status === 'complete' ? 'Saved; human review required.' : '')}
+                  ${project.workflow.mode === LOCALE_MODE ? html`
+                    <small>Rollout: ${item.rolloutStatus}</small>
+                    <small>Translation: ${translationStatus(item)}</small>` : nothing}
                   <small>Source SHA-256: ${item.sourceHash.slice(0, 12)}...</small>
                   ${item.savedDate ? html`<small>Save verified: ${new Date(item.savedDate).toLocaleString()}</small>` : nothing}
                 </td>
@@ -277,30 +326,28 @@ class StartWorkflowApp extends LitElement {
                   <a href=${`https://da.live/edit#/${this.org}/${this.site}${item.destination.replace(/\.html$/, '')}`}
                     target="_blank" rel="noopener noreferrer"
                     aria-label=${`Open ${item.destination} in DA`}>Open in DA</a>
-                  <label class="option">
-                    <input type="checkbox" ?disabled=${this.busy}
-                      .checked=${this.publishSelection.has(item.destination.replace(/\.html$/, ''))}
-                      aria-label=${`Reviewed and select ${item.destination}`}
-                      @change=${(event) => this.selectForPublish(item.destination.replace(/\.html$/, ''), event.target.checked)}>Reviewed
-                  </label>` : 'Available after a confirmed save.'}</td>
+                  <small>Included in publish-request handoff.</small>` : 'Available after a confirmed save.'}</td>
               </tr>`)}</tbody>
           </table>
         </div>
         <h3>Next: request publish approval</h3>
-        <p>Open each completed translation in DA, review it, then check Reviewed to select it.
-          Review selections are cleared when you reload or resume a workflow.
-          This is an author confirmation, not a formal review/sign-off gate.</p>
-        <p>Continue opens the existing publish-request app in a new tab with the selected paths.
+        <p>All successfully processed and confirmed-saved destinations are automatically included.
+          Failed and unfinished destinations are excluded. Review content in DA or during approval;
+          no Reviewed checkboxes are required to continue.</p>
+        <p>Continue opens the existing publish-request app in a new tab with the completed paths.
           It does not preview, submit requests, send emails, or publish automatically.
           In that app, validate, explicitly preview where needed, then choose Request Publish.
           Submitting requests uses the production approval service by default and can send real emails.</p>
         <div class="actions">
-          ${this.publishUrl && !this.busy ? html`
-            <a class="primary" href=${this.publishUrl} target="_blank" rel="noopener noreferrer">
-              Continue to Publish Request (${this.publishSelection.size})
-            </a>` : html`
-            <button disabled>Continue to Publish Request (${this.publishSelection.size})</button>`}
+          ${this.publishBatches.length && !this.busy ? this.publishBatches.map((batch, index) => html`
+            <a class="primary" href=${batch.url} target="_blank" rel="noopener noreferrer">
+              Continue to Publish Request (${batch.count})${this.publishBatches.length > 1
+  ? ` — batch ${index + 1} of ${this.publishBatches.length}` : ''}
+            </a>`) : html`<button disabled>Continue to Publish Request (0)</button>`}
         </div>
+        ${this.publishBatches.length > 1 ? html`<p>Open each batch to transfer all completed destinations.
+          Batches respect the publish-request URL and 50-path limits; no paths are dropped.</p>` : nothing}
+        ${this.publishError ? html`<p class="error" role="alert">${this.publishError}</p>` : nothing}
       </section>
     `;
   }
@@ -313,7 +360,7 @@ class StartWorkflowApp extends LitElement {
       <link rel="stylesheet" href=${STYLE}>
       <main class="workflow-app">
         <h1>Start Translation Workflow</h1>
-        <p><strong>${this.org} / ${this.site}</strong> · Google · English → French / German</p>
+        <p><strong>${this.org} / ${this.site}</strong> · English → configured regional locales · Google where translation is needed</p>
         <p class="notice">Interactive POC: keep this app open while running. Closing it stops execution.
           Progress is saved in DA and can be retrieved later. Nothing is published.</p>
         ${this.message ? html`
@@ -321,7 +368,7 @@ class StartWorkflowApp extends LitElement {
             role=${this.message.error ? 'alert' : 'status'}>${this.message.text}</p>` : nothing}
         <button ?disabled=${this.busy} @click=${() => this.perform(async () => {
   this.config = await this.client.loadConfig();
-  this.targetCodes = new Set(this.config.targets.map((target) => target.code));
+  this.resetTargets();
   this.message = { text: 'Translation configuration loaded.' };
 })}>Reload translation configuration</button>
         <section aria-labelledby="browse-title">

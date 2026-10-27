@@ -1,5 +1,5 @@
 import {
-  fingerprint, summarize, validateProject,
+  fingerprint, LOCALE_MODE, summarize, validateProject,
 } from './model.js';
 
 export class ReviewRequired extends Error {}
@@ -48,6 +48,81 @@ async function executeItem(item, project, io, checkpoint) {
   }
 }
 
+async function assertSource(item, io) {
+  const source = await io.readSource(item.source);
+  if (!source || await fingerprint(source.content) !== item.sourceHash) {
+    throw new ReviewRequired(`Source changed or was removed: ${item.source}. Create a new workflow for the new revision.`);
+  }
+  return source.content;
+}
+
+async function matchesDestination(item, hash, io) {
+  const destination = await io.readDestination(item.destination);
+  return Boolean(destination && await fingerprint(destination.content) === hash);
+}
+
+async function executeLocaleItem(item, io, checkpoint) {
+  if (item.outputHash && await matchesDestination(item, item.outputHash, io)) {
+    item.status = 'complete';
+    item.rolloutStatus = 'complete';
+    item.savedDate = Date.now();
+    item.error = '';
+    return;
+  }
+  const source = await assertSource(item, io);
+  item.attempts += 1;
+  item.error = '';
+  delete item.outputHash;
+  delete item.savedDate;
+  item.status = 'queued';
+  const rollout = await io.prepareRollout(source);
+  item.rolloutHash = await fingerprint(rollout);
+  const alreadyRolledOut = item.rolloutStatus !== 'queued'
+    && await matchesDestination(item, item.rolloutHash, io);
+  if (!alreadyRolledOut) {
+    item.status = 'rolling-out';
+    item.rolloutStatus = 'saving';
+    await checkpoint();
+    await assertSource(item, io);
+    try {
+      await io.saveDestination(item.destination, rollout);
+      if (!await matchesDestination(item, item.rolloutHash, io)) {
+        throw new Error('The saved rollout does not match the source copy.');
+      }
+    } catch (error) {
+      item.rolloutStatus = 'save-unconfirmed';
+      throw new Error(`Rollout save not confirmed for ${item.destination}: ${error.message}. Retry reconciles the destination before continuing.`);
+    }
+  }
+  item.rolloutStatus = 'complete';
+  item.rolloutSavedDate = Date.now();
+  if (!item.translate) {
+    item.outputHash = item.rolloutHash;
+    item.status = 'complete';
+    item.savedDate = Date.now();
+    return;
+  }
+  item.status = 'translating';
+  await checkpoint();
+  const output = await io.translate(rollout, item.translationCode);
+  if (typeof output !== 'string' || !output.trim()) throw new Error('Google returned no translated content.');
+  item.outputHash = await fingerprint(output);
+  item.status = 'saving';
+  await checkpoint();
+  await assertSource(item, io);
+  try {
+    await io.saveDestination(item.destination, output);
+    if (!await matchesDestination(item, item.outputHash, io)) {
+      throw new Error('The saved translation does not match the translated output.');
+    }
+  } catch (error) {
+    item.status = 'save-unconfirmed';
+    throw new Error(`Translation save not confirmed for ${item.destination}: ${error.message}. Retry reconciles the saved content first.`);
+  }
+  item.status = 'complete';
+  item.savedDate = Date.now();
+}
+
 /**
  * Status writes are a hard gate: do not continue content writes when progress
  * cannot be persisted. Completed tasks are never translated or written again.
@@ -58,6 +133,12 @@ export async function runProject(project, config, io, {
   validateProject(project, project.org, project.site);
   if (await fingerprint(JSON.stringify(config.sheets)) !== project.workflow.configHash) {
     throw new Error('Translation configuration changed. Create a new workflow using the current configuration.');
+  }
+  if (project.workflow.mode === LOCALE_MODE && project.langs.some((lang) => !config.targets
+    .some((target) => target.id === lang.id && target.location === lang.location
+      && target.code === lang.code && target.translationCode === lang.translationCode
+      && target.translate === lang.translate))) {
+    throw new Error('Workflow targets do not match the configured locales. No content was written.');
   }
   let persistenceError;
   const checkpoint = async () => {
@@ -77,7 +158,13 @@ export async function runProject(project, config, io, {
     if (item.status !== 'complete' && item.status !== 'needs-review') {
       try {
         // eslint-disable-next-line no-await-in-loop
-        await executeItem(item, project, io, checkpoint);
+        if (project.workflow.mode === LOCALE_MODE) {
+          // eslint-disable-next-line no-await-in-loop
+          await executeLocaleItem(item, io, checkpoint);
+        } else {
+          // eslint-disable-next-line no-await-in-loop
+          await executeItem(item, project, io, checkpoint);
+        }
       } catch (error) {
         if (persistenceError) {
           throw new Error(`Workflow status could not be saved. Execution stopped: ${persistenceError.message}. Reload the project to reconcile progress.`);

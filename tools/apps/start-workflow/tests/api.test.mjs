@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { modules, json, sheets } from './helpers.mjs';
+import { modules, json, regionalSheets, sheets } from './helpers.mjs';
 
 async function client(responses, options = {}) {
   const loaded = await modules({
@@ -125,4 +125,23 @@ test('provider failure, empty output and missing main are explicit errors, never
   await assert.rejects(f.client.translate('<main>a</main>', 'fr', sheets()), /Rate limited/);
   await assert.rejects(f.client.translate('<main>a</main>', 'fr', sheets()), /did not return/);
   await assert.rejects(f.client.translate('<main>a</main>', 'fr', sheets()), /missing its main/);
+});
+
+test('regional destination writes use DA Source and support configured provider base codes beyond French/German', async () => {
+  const f = await client([
+    new Response(null, { status: 200 }),
+    new Response(null, { status: 404 }),
+    json({ translated: '<main>Hola</main>' }),
+    json({ translated: '<main>Chinese</main>' }),
+  ], { remote: native });
+  await f.client.saveDestination('/en/pr/fragments/a.html', '<main>Hello</main>');
+  assert.ok(f.calls[0].url.endsWith('/source/org/site/en/pr/fragments/a.html'));
+  assert.equal(await f.client.readDestination('/es/pr/fragments/a.html'), null);
+  assert.equal(await f.client.translate('<main>Hello</main>', 'es', regionalSheets()), '<main>Hola</main>');
+  assert.equal(f.calls[2].options.body.get('tolang'), 'es');
+  await f.client.translate('<main>Hello</main>', 'zh-CN', regionalSheets());
+  assert.equal(f.calls[3].options.body.get('tolang'), 'zh-CN');
+  await assert.rejects(f.client.translate('<main>Hello</main>', 'fr-ca', regionalSheets()), /Unsupported/);
+  await assert.rejects(f.client.saveDestination('/.da/config.html', 'bad'), /Invalid/);
+  assert.equal(f.calls.length, 4);
 });

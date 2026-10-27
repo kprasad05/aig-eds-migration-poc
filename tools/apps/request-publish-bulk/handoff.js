@@ -5,13 +5,14 @@ const MAX_LENGTH = 7000;
 
 function validatePayload(payload, org, site) {
   validateSite(org, site);
-  if (!payload || payload.version !== 1 || payload.org !== org || payload.site !== site
+  if (!payload || ![1, 2].includes(payload.version) || payload.org !== org || payload.site !== site
     || !/^workflow-[0-9a-f-]{36}$/.test(payload.workflowId)
     || !Array.isArray(payload.paths) || !payload.paths.length || payload.paths.length > 50
     || new Set(payload.paths).size !== payload.paths.length
     || payload.paths.some((path) => !isValidPath(path)
-      || !/^\/(?:fr|de)(?:\/[A-Za-z0-9_-]+)+$/.test(path))) {
-    throw new Error('Invalid workflow handoff: expected 1-50 unique French/German page paths for this site.');
+      || !(payload.version === 1 ? /^\/(?:fr|de)(?:\/[A-Za-z0-9_-]+)+$/
+        : /^\/[A-Za-z][A-Za-z0-9_-]*\/[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)+$/).test(path))) {
+    throw new Error('Invalid workflow handoff: expected 1-50 unique supported destination paths for this site.');
   }
   return payload;
 }
@@ -32,10 +33,10 @@ export function readWorkflowHandoff(search, org, site) {
 }
 
 export function createWorkflowHandoffUrl({
-  org, site, workflowId, paths, location,
+  org, site, workflowId, paths, location, version = 1,
 }) {
   const payload = validatePayload({
-    version: 1, org, site, workflowId, paths,
+    version, org, site, workflowId, paths,
   }, org, site);
   const params = new URLSearchParams(location.search);
   const local = ['localhost', '127.0.0.1'].includes(location.hostname);
@@ -57,7 +58,30 @@ export function createWorkflowHandoffUrl({
   url.searchParams.set('site', site);
   url.searchParams.set(PARAM, JSON.stringify(payload));
   if (url.href.length > MAX_LENGTH) {
-    throw new Error('The handoff URL is too long. Select fewer destinations and continue in smaller batches.');
+    throw new RangeError('The handoff URL is too long. Continue in smaller batches.');
   }
   return url.href;
+}
+
+export function createWorkflowHandoffBatches(options) {
+  const batches = [];
+  let paths = [];
+  let url;
+  options.paths.forEach((path) => {
+    if (paths.length === 50) {
+      batches.push({ url, count: paths.length });
+      paths = [];
+    }
+    try {
+      url = createWorkflowHandoffUrl({ ...options, paths: [...paths, path] });
+    } catch (error) {
+      if (!(error instanceof RangeError) || !paths.length) throw error;
+      batches.push({ url, count: paths.length });
+      paths = [];
+      url = createWorkflowHandoffUrl({ ...options, paths: [path] });
+    }
+    paths.push(path);
+  });
+  if (paths.length) batches.push({ url, count: paths.length });
+  return batches;
 }
