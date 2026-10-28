@@ -5,8 +5,9 @@ import vm from 'node:vm';
 
 const appSource = await readFile(new URL('../request-publish-bulk.js', import.meta.url), 'utf8');
 const pathsSource = await readFile(new URL('../paths.js', import.meta.url), 'utf8');
+const handoffSource = await readFile(new URL('../handoff.js', import.meta.url), 'utf8');
 
-async function createApp(overrides = {}) {
+async function createApp(overrides = {}, search = '') {
   const requests = [];
   const previews = [];
   const toasts = [];
@@ -31,7 +32,7 @@ async function createApp(overrides = {}) {
   }
   const context = vm.createContext({
     URLSearchParams, URL,
-    window: { location: { search: '', hostname: 'localhost' } },
+    window: { location: { search, hostname: 'localhost' } },
     document: { documentElement: { style: {} } },
     customElements: { define: (_name, element) => { App = element; } },
     console: {
@@ -64,6 +65,8 @@ async function createApp(overrides = {}) {
   const components = await synthetic({});
   const paths = new vm.SourceTextModule(pathsSource, { context });
   await paths.link(() => {});
+  const handoff = new vm.SourceTextModule(handoffSource, { context });
+  await handoff.link(() => paths);
   const module = new vm.SourceTextModule(appSource, {
     context,
     importModuleDynamically: async (specifier) => {
@@ -78,6 +81,7 @@ async function createApp(overrides = {}) {
     if (specifier.endsWith('/toast.js')) return toast;
     if (specifier === './api.js') return helpers;
     if (specifier === './paths.js') return paths;
+    if (specifier === './handoff.js') return handoff;
     throw new Error(`Unexpected import: ${specifier}`);
   });
   await module.evaluate();
@@ -87,6 +91,61 @@ async function createApp(overrides = {}) {
   app.token = 'test-secret-token';
   return { app, requests, previews, toasts, logs };
 }
+
+const workflowHandoff = {
+  version: 1, org: 'org', site: 'site',
+  workflowId: 'workflow-00000000-0000-4000-8000-000000000000',
+  paths: ['/fr/fragments/a', '/de/fragments/a'],
+};
+
+function handoffSearch(payload = workflowHandoff) {
+  return `?${new URLSearchParams({ workflowHandoff: JSON.stringify(payload) })}`;
+}
+
+test('workflow handoff only prefills editable paths; preview and submission remain explicit', async () => {
+  const { app, requests, previews } = await createApp({}, handoffSearch());
+  app.loadWorkflowHandoff();
+  assert.equal(app._flow, 'paths');
+  assert.equal(app._pathsText, '/fr/fragments/a\n/de/fragments/a');
+  assert.match(app._message.text, /No requests have been submitted/);
+  assert.equal(app._items.length, 0);
+  assert.equal(requests.length, 0);
+  assert.equal(previews.length, 0);
+  await app.handleValidate();
+  assert.equal(app._submittable.length, 2);
+  assert.equal(requests.length, 0);
+  assert.equal(previews.length, 0);
+});
+
+test('regional workflow v2 imports English and Spanish locale paths without preview or submission', async () => {
+  const { app, requests, previews } = await createApp({}, handoffSearch({
+    ...workflowHandoff, version: 2, paths: ['/en/pr/fragments/a', '/es/pr/fragments/a'],
+  }));
+  app.loadWorkflowHandoff();
+  assert.equal(app._pathsText, '/en/pr/fragments/a\n/es/pr/fragments/a');
+  assert.equal(requests.length, 0);
+  assert.equal(previews.length, 0);
+  await app.handleValidate();
+  assert.equal(app._submittable.length, 2);
+  assert.equal(requests.length, 0);
+  assert.equal(previews.length, 0);
+});
+
+test('rejects wrong-site/malformed handoff with an explicit error and no preview/submission', async () => {
+  for (const search of [
+    handoffSearch({ ...workflowHandoff, site: 'other' }),
+    '?workflowHandoff=not-json',
+    handoffSearch({ ...workflowHandoff, paths: ['/en/fragments/a'] }),
+  ]) {
+    const { app, requests, previews, toasts } = await createApp({}, search);
+    app.loadWorkflowHandoff();
+    assert.equal(app._pathsText, '');
+    assert.equal(app._message.type, 'error');
+    assert.equal(toasts.length, 1);
+    assert.equal(requests.length, 0);
+    assert.equal(previews.length, 0);
+  }
+});
 
 test('paste flow deduplicates paths and blocks missing, stale, and invalid pages', async () => {
   const { app, requests, previews, toasts } = await createApp({

@@ -1,0 +1,199 @@
+:host {
+  color-scheme: light dark;
+  color: light-dark(#222, #eee);
+  background: light-dark(#fff, #171717);
+  display: block;
+  font: 16px/1.5 system-ui, sans-serif;
+}
+
+.workflow-app {
+  max-width: 1100px;
+  padding: 16px;
+  margin: auto;
+}
+
+.workflow-app section {
+  border-top: 1px solid light-dark(#ccc, #555);
+  margin-top: 24px;
+  padding-top: 16px;
+}
+
+.workflow-app fieldset {
+  border: 1px solid light-dark(#aaa, #777);
+  border-radius: 6px;
+  margin: 16px 0;
+}
+
+.workflow-app label {
+  display: block;
+}
+
+.workflow-app input,
+.workflow-app select,
+.workflow-app button {
+  color: inherit;
+  font: inherit;
+  padding: 8px;
+}
+
+.workflow-app input:not([type="checkbox"]),
+.workflow-app select {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  max-width: 600px;
+  margin: 4px 0 12px;
+}
+
+.workflow-app button {
+  cursor: pointer;
+  border: 1px solid light-dark(#777, #aaa);
+  border-radius: 4px;
+  background: light-dark(#f5f5f5, #333);
+}
+
+.workflow-app button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.workflow-app .primary {
+  background: #294bd6;
+  color: #fff;
+  border-color: #294bd6;
+}
+
+.workflow-app :focus-visible {
+  outline: 3px solid light-dark(#1957d2, #99baff);
+  outline-offset: 3px;
+}
+
+.workflow-app .option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.workflow-app .locale-picker {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 600px;
+  margin: 4px 0 12px;
+  border: 1px solid light-dark(#777, #aaa);
+  border-radius: 4px;
+  background: light-dark(#fff, #222);
+}
+
+.workflow-app .locale-picker summary {
+  cursor: pointer;
+  padding: 8px;
+}
+
+.workflow-app .locale-picker summary[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.workflow-app .locale-options {
+  max-height: 240px;
+  overflow-y: auto;
+  border-top: 1px solid light-dark(#ccc, #555);
+  padding: 0 12px;
+}
+
+.workflow-app .locale-options .option {
+  overflow-wrap: anywhere;
+}
+
+.workflow-app .locale-options input {
+  flex-shrink: 0;
+}
+
+.workflow-app .page-list,
+.workflow-app .paths,
+.workflow-app .history {
+  list-style: none;
+  padding: 0;
+}
+
+.workflow-app .paths li,
+.workflow-app .history li {
+  padding: 6px 0;
+  overflow-wrap: anywhere;
+}
+
+.workflow-app .actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+.workflow-app .actions a {
+  display: inline-block;
+  padding: 8px;
+  border: 1px solid #294bd6;
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.workflow-app .notice,
+.workflow-app .error {
+  padding: 12px;
+  border-left: 4px solid #4774e6;
+  background: light-dark(#eef3ff, #202c40);
+}
+
+.workflow-app .error {
+  border-color: #d74736;
+  background: light-dark(#fff0ed, #442723);
+}
+
+.workflow-app dialog {
+  box-sizing: border-box;
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  color: inherit;
+  background: light-dark(#fff, #222);
+  border: 1px solid light-dark(#aaa, #777);
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.workflow-app dialog::backdrop {
+  background: #0008;
+}
+
+.workflow-app .table-scroll {
+  overflow-x: auto;
+}
+
+.workflow-app table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+  text-align: left;
+}
+
+.workflow-app th,
+.workflow-app td {
+  border-bottom: 1px solid light-dark(#ccc, #555);
+  padding: 10px;
+  vertical-align: top;
+}
+
+.workflow-app small {
+  display: block;
+}
+
+.workflow-app code {
+  overflow-wrap: anywhere;
+}
+
+@media (width >= 600px) {
+  .workflow-app {
+    padding: 32px;
+  }
+}
