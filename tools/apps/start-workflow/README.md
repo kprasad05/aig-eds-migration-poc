@@ -76,8 +76,10 @@ configuration pass the bounded adapter gates. After the administrator saved the
 site-wide permission grant, read-only preflight passed for the approved source and
 all sixty destinations: five already exist, fifty-five are missing, and thirty-four
 would require translation calls. Both caller and service-account permission checks
-passed. No actual All Countries job has been run. The real DA SDK token and an
-explicitly confirmed bulk overwrite/translation run still need tenant acceptance.
+passed. The subsequent user-submitted `/en/fragments/hello-world.html` job
+`a7d524a69680e059a965b6847e50b4b8` completed all sixty destinations. Its first UI
+response was hidden by duplicate CORS headers; the Stage API now leaves CORS
+headers to Runtime. Retrieve that existing job rather than resubmitting it.
 
 The backend restricts execution to `kprasad05/aig-eds-migration-poc`, independently
 loads and fingerprints the authoritative translation configuration, and checks
@@ -85,7 +87,19 @@ loads and fingerprints the authoritative translation configuration, and checks
 write permissions before accepting a new job. The administrator has granted the
 service account `/aig-eds-migration-poc/**` write access; this also includes read,
 delete and site-configuration access. The backend did not edit permissions.
-Review this broad grant before production use. No bulk run has been performed.
+Review this broad grant before production use. The user-submitted sixty-destination
+job completed without automatically publishing any content.
+
+An opt-in real-browser Stage connection regression is available:
+
+```sh
+node --test tools/apps/start-workflow/tests/background-stage.e2e.mjs
+```
+
+It requires `aio login` and checks an unknown-job GET and an unconfirmed POST through
+Chromium's actual cross-origin fetch enforcement. It does not submit jobs, translate
+or write content. This complements the mocked browser workflow tests: HTTP status
+checks alone do not catch duplicate CORS headers rejected by browsers.
 
 **Current background adapter is deliberately bounded:** simple HTML/default text
 and `hero-banner` blocks only; at most ten meaningful text nodes in supported text
