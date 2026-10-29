@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
+import { createHash } from 'node:crypto';
 import { chromium, expect } from '@playwright/test';
 import { regionalSheets } from './helpers.mjs';
 
@@ -19,8 +20,10 @@ async function browserFixture(t, {
     ['/en/fragments/b.html', '<html><body><main><p>Hello B</p></main></body></html>'],
   ]);
   const projects = new Map();
+  const backgroundJobs = new Map();
   const calls = {
     translations: 0, destinations: 0, approval: 0, errors: [], stages: [],
+    backgroundSubmissions: 0, backgroundReads: 0, backgroundRecoveries: 0,
   };
   page.on('pageerror', (error) => calls.errors.push(error.message));
   context.on('page', (next) => next.on('pageerror', (error) => calls.errors.push(error.message)));
@@ -29,7 +32,14 @@ async function browserFixture(t, {
     const request = route.request();
     const url = new URL(request.url());
     const respond = (body, status = 200, type = 'application/json') => route.fulfill({
-      status, body, contentType: type, headers: { 'Access-Control-Allow-Origin': '*' },
+      status,
+      body,
+      contentType: type,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type, x-gw-ims-org-id',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      },
     });
     try {
       if (url.hostname === 'workflow.test') {
@@ -72,6 +82,46 @@ async function browserFixture(t, {
       }
       if (request.method() === 'OPTIONS') return await respond('', 204);
       assert.equal(request.headers().authorization, 'Bearer session');
+      if (url.hostname.endsWith('.adobeioruntime.net')) {
+        assert.ok(url.pathname.endsWith('/bulk-workflow'));
+        assert.equal(request.headers()['x-gw-ims-org-id'], '2FBC7B975CFE21C40A495FBB@AdobeOrg');
+        let job;
+        if (request.method() === 'POST') {
+          const payload = request.postDataJSON();
+          if (payload.confirm === 'recover-all-countries') {
+            calls.backgroundRecoveries += 1;
+            job = backgroundJobs.get(payload.jobId);
+          } else {
+            assert.equal(payload.confirm, 'start-all-countries');
+            assert.equal(payload.mode, 'all-countries');
+            assert.equal(payload.overwriteConfirmed, true);
+            assert.equal(payload.targetIds.length, 6);
+            calls.backgroundSubmissions += 1;
+            const jobId = createHash('sha256').update(`all-countries-v1\norg/site\n${payload.requestId}`).digest('hex').slice(0, 32);
+            const items = payload.paths.flatMap((sourcePath) => payload.targetIds.map((target) => ({
+              source: sourcePath, destination: `${target}${sourcePath.slice(3)}`, status: 'queued',
+            })));
+            job = {
+              jobId, org: 'org', site: 'site', title: payload.title,
+              total: items.length, completed: 0, status: 'queued', stage: 'queued',
+              offset: 0, nextOffset: null, items,
+            };
+            backgroundJobs.set(jobId, job);
+            if (state.backgroundSubmitError) return await respond('{"error":"Dispatch was not confirmed. Retrieve saved status."}', 503);
+          }
+        } else {
+          calls.backgroundReads += 1;
+          job = backgroundJobs.get(url.searchParams.get('jobId'));
+        }
+        if (!job) return await respond('{"error":"Background job not found."}', 404);
+        if (state.backgroundComplete) {
+          job.status = 'complete';
+          job.stage = 'complete';
+          job.completed = job.total;
+          job.items.forEach((item) => { item.status = 'complete'; });
+        }
+        return await respond(JSON.stringify(job), request.method() === 'POST' ? 202 : 200);
+      }
       if (url.hostname === 'ims-na1.adobelogin.com') return await respond('{"email":"author@example.com"}');
       if (url.hostname.endsWith('.workers.dev')) {
         calls.approval += 1;
@@ -129,7 +179,9 @@ async function browserFixture(t, {
       return respond(JSON.stringify({ error: error.message }), 500);
     }
   });
-  return { browser, page, content, projects, calls, state };
+  return {
+    browser, context, page, content, projects, calls, state,
+  };
 }
 
 async function addTarget(dialog, location, locale) {
@@ -139,6 +191,62 @@ async function addTarget(dialog, location, locale) {
   await dialog.getByRole('checkbox', { name: new RegExp(`\\(${locale}\\)$`) }).check();
   await summary.click();
 }
+
+test('browser: All Countries submits to App Builder and progress survives closing the original tab', async (t) => {
+  const f = await browserFixture(t);
+  await f.page.goto(appUrl);
+  await f.page.getByLabel('/en/fragments/a.html', { exact: true }).check();
+  await f.page.getByRole('button', { name: 'Start Workflow (1)', exact: true }).click();
+  const dialog = f.page.getByRole('dialog');
+  await dialog.getByRole('checkbox', { name: /^All Countries/ }).check();
+  await expect(dialog.getByRole('button', { name: /^Remove target / })).toHaveCount(6);
+  const start = dialog.getByRole('button', { name: 'Start App Builder background job', exact: true });
+  await expect(start).toBeDisabled();
+  await dialog.getByRole('checkbox', { name: 'I understand that existing destination content will be overwritten.' }).check();
+  await start.click();
+  await expect(dialog).not.toBeVisible();
+  await expect(f.page.getByText('0/6 destinations saved.', { exact: false })).toBeVisible();
+  assert.equal(f.calls.backgroundSubmissions, 1);
+  assert.equal(f.calls.translations, 0);
+  assert.equal(f.calls.destinations, 0);
+  const savedUrl = f.page.url();
+  assert.match(savedUrl, /backgroundJob=[a-f0-9]{32}/);
+  const next = await f.context.newPage();
+  await f.page.close();
+  f.state.backgroundComplete = true;
+  await next.goto(savedUrl);
+  await expect(next.getByText('6/6 destinations saved.', { exact: false })).toBeVisible();
+  assert.equal(f.calls.backgroundSubmissions, 1);
+  assert.equal(f.calls.backgroundRecoveries, 0);
+  await next.getByRole('button', { name: 'Prepare publish request for confirmed saves', exact: true }).click();
+  const link = next.getByRole('link', { name: 'Review Publish Request batch 1 (6)', exact: true });
+  await expect(link).toBeVisible();
+  const payload = JSON.parse(new URL(await link.getAttribute('href')).searchParams.get('workflowHandoff'));
+  assert.equal(payload.version, 2);
+  assert.equal(payload.paths.length, 6);
+  assert.equal(f.calls.approval, 0);
+  assert.deepEqual(f.calls.errors, []);
+});
+
+test('browser: lost dispatch response keeps the saved job ID and refresh does not resubmit', async (t) => {
+  const f = await browserFixture(t);
+  f.state.backgroundSubmitError = true;
+  await f.page.goto(appUrl);
+  await f.page.getByLabel('/en/fragments/a.html', { exact: true }).check();
+  await f.page.getByRole('button', { name: 'Start Workflow (1)', exact: true }).click();
+  const dialog = f.page.getByRole('dialog');
+  await dialog.getByRole('checkbox', { name: /^All Countries/ }).check();
+  await dialog.getByRole('checkbox', { name: 'I understand that existing destination content will be overwritten.' }).check();
+  await dialog.getByRole('button', { name: 'Start App Builder background job', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Dispatch was not confirmed');
+  const savedUrl = f.page.url();
+  await f.page.goto(savedUrl);
+  await expect(f.page.getByText('0/6 destinations saved.', { exact: false })).toBeVisible();
+  assert.equal(f.calls.backgroundSubmissions, 1);
+  assert.equal(f.calls.translations, 0);
+  assert.equal(f.calls.destinations, 0);
+  assert.deepEqual(f.calls.errors, []);
+});
 
 test('browser: multi-select, modal, real DOM status, partial failure, reload retrieval and idempotent retry', async (t) => {
   const f = await browserFixture(t, { failGerman: true });

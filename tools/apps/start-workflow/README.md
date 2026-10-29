@@ -1,4 +1,4 @@
-# Start Translation Workflow — interactive POC
+# Start Translation Workflow — DA / App Builder POC
 
 A standalone DA app for selecting multiple English pages/fragments, choosing
 language locations and regional locales from the translation configuration,
@@ -17,9 +17,13 @@ It does **not** add a button to Adobe's content-browser toolbar.
   `/es/pr/fragments/example.html` for Spanish/Puerto Rico
   (rollout, then translate, then save).
 - At most 25 selected source pages per project. Folder selection is not recursive.
-- **Foreground only. Keep the app open during execution.** Closing/navigating away
+- **Individual locales: keep the app open during execution.** Closing/navigating away
   stops execution. There is no queue, Worker, token storage, or unattended runner.
   A request already sent to a remote service may still finish after the app closes.
+- **All Countries: App Builder background execution.** Selects all eligible configured
+  regional locales across languages for the current site, not all sites or every country
+  in the world. The browser only submits the job and reads saved progress. The backend
+  uses its own service account, not a stored author token.
 - This app does not preview, publish, or submit publish requests itself.
 - **New locale workflows overwrite existing destination content, including local
   edits and earlier translations.** The wizard shows the generated paths, the
@@ -30,12 +34,73 @@ It does **not** add a button to Adobe's content-browser toolbar.
   copy. If translation fails, that copy remains, but the task is not complete
   and is excluded from the publish-request handoff. Review any existing pending
   publish requests for overwritten paths separately.
-- Native translation project storage, plus app-specific task metadata. Native
+- Individual locales use native translation project storage, plus app-specific task metadata. Native
   dashboard compatibility and tenant execution still require validation.
+  Background jobs instead use App Builder State with thirty-day retention and
+  submitting-user ownership checks.
 
-The earlier new-Worker proposal was superseded by the choice to use an interactive
-session-bound POC. A backend and approved renewable/delegated authentication remain
-necessary for unattended execution.
+The existing individual-locale runner remains session-bound. App Builder is the
+background backend for All Countries; no additional external Worker or All Sites
+selection was added.
+
+## All Countries background POC
+
+1. Select source pages and open **Start Workflow**.
+2. Check **All Countries**, review all generated source/destination pairs, provider
+   charges, the background-content limitations below, and the overwrite warning.
+3. Confirm overwriting, then choose **Start App Builder background job**.
+4. Once accepted, save the background job ID or bookmark the app URL (which includes
+   `backgroundJob`). The tab can now be closed. The URL contains no credentials.
+5. Reopen the bookmarked URL, or enter the ID under **App Builder background
+   workflows**. **Refresh background progress** is read-only. Progress is paged
+   fifty destinations at a time and expires after thirty days.
+6. For a queued dispatch or ended worker, use the explicit recovery control.
+   Active/unknown workers are not replaced; uncertain writes/translations become
+   `needs-review`, never automatic billable retries. There is no recurring recovery
+   scheduler. Source/configuration/destination changes halt the job.
+7. **Prepare publish request for confirmed saves** creates the existing bounded
+   handoff links. Failed, queued and uncertain tasks are excluded. Review and
+   publishing remain explicit human actions.
+
+The client uses the protected Stage `bulk-workflow` action in
+`258616-aigdatranslationpoc-stage`, package `aig-da-translation-backend`, with the
+Adobe Consulting workspace IMS organization header. A signed-in author must also
+be authorized to invoke this App Builder application. CORS preflight and job owner
+lookup have been verified in Stage; local browser tests mock remote processing.
+The standalone backend project is `../aig-da-translation-backend`.
+
+The 2026-10-29 Stage isolated background job completed successfully and duplicate
+submission reused its completed activation. A read-only check found **60 eligible
+regional countries** in the actual configuration. The approved source and its
+configuration pass the bounded adapter gates. After the administrator saved the
+site-wide permission grant, read-only preflight passed for the approved source and
+all sixty destinations: five already exist, fifty-five are missing, and thirty-four
+would require translation calls. Both caller and service-account permission checks
+passed. No actual All Countries job has been run. The real DA SDK token and an
+explicitly confirmed bulk overwrite/translation run still need tenant acceptance.
+
+The backend restricts execution to `kprasad05/aig-eds-migration-poc`, independently
+loads and fingerprints the authoritative translation configuration, and checks
+**both the caller's and service account's** source/configuration read and destination
+write permissions before accepting a new job. The administrator has granted the
+service account `/aig-eds-migration-poc/**` write access; this also includes read,
+delete and site-configuration access. The backend did not edit permissions.
+Review this broad grant before production use. No bulk run has been performed.
+
+**Current background adapter is deliberately bounded:** simple HTML/default text
+and `hero-banner` blocks only; at most ten meaningful text nodes in supported text
+elements and a 5,000-character translation envelope per source. DA metadata,
+regional-diff markup, other blocks and non-empty native DNT/custom rules are rejected
+before writes rather than ignored. Use individual locales for content requiring
+the native DA helpers. This is not yet a production replacement for those helpers.
+
+Workers claim one task per Runtime activation, persist pre-side-effect checkpoints,
+and chain the next task only after confirmed completion. A failed task halts the
+job; confirmed earlier tasks remain available for review. Ten-minute atomic
+destination reservations prevent overlapping App Builder tasks from writing the
+same path; external DA editors are not locked. The backend rechecks the captured
+destination revision before overwriting, but DA does not expose an atomic
+compare-and-save operation. Do not edit/run other clients against these paths.
 
 ## Prerequisites
 
@@ -81,7 +146,7 @@ explicit error. It does not change your DA configuration.
 After this branch's code has been pushed and synchronized, open inside DA:
 
 ```text
-https://da.live/app/kprasad05/aig-eds-migration-poc/tools/apps/start-workflow/start-workflow?ref=poc-workflow&org=kprasad05&site=aig-eds-migration-poc
+https://da.live/app/kprasad05/aig-eds-migration-poc/tools/apps/start-workflow/start-workflow?ref=poc-translate-wf-all-locales&org=kprasad05&site=aig-eds-migration-poc
 ```
 
 For local code, start the AEM CLI from the repository root:
@@ -144,7 +209,7 @@ branch. Do not change only one of them.
    the locale dropdown, or Escape again to dismiss the wizard.
    Review every generated path and its **Rollout only** or **Rollout → Translate**
    operation. Acknowledge the overwrite warning. Cancel/Escape performs no writes.
-4. Choose **Create project and run**. Sources are read and fingerprinted before
+4. For individual locales, choose **Create project and run**. Sources are read and fingerprinted before
    project creation. Keep the app open.
 5. Review per-page status, attempts and errors. **Pause after current task** waits
    for the current task and its checkpoint before stopping.
@@ -222,6 +287,9 @@ publishing remain tenant acceptance checks, not results of the mocked tests.
    and approve/publish only if the test content is intended to go live.
 
 ## Execution and persistence
+
+This section describes the individual-locale foreground runner. All Countries
+uses the separate App Builder persistence and bounded adapter described above.
 
 The app uses authenticated DA Admin `list` and `source` requests, including list
 continuation tokens. Project files are stored at:
