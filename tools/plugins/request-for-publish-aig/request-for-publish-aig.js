@@ -261,7 +261,9 @@ class RequestForPublishAigPlugin extends LitElement {
 
     // Compliance details are stored in Supabase and shown in the reviewer's
     // Compliance Details card, so they are intentionally omitted from the comment.
-    const commentParts = [`API test link: ${apiUrl}`];
+    // Temporarily disabled while debugging approver notification email failures. Workaround is to display API link in a dedicated section (like compliance).
+    // const commentParts = [`API test link: ${apiUrl}`];
+    const commentParts = [];
     if (comment) commentParts.push(comment);
     const fullComment = commentParts.join('\n\n');
 
