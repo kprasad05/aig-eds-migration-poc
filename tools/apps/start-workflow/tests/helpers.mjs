@@ -81,9 +81,11 @@ export async function modules({ request, remote = {}, globals = {} } = {}) {
   await api.evaluate();
   const handoff = await load(new URL('../../request-publish-bulk/handoff.js', import.meta.url));
   await handoff.evaluate();
+  const background = await load(new URL('../background.js', import.meta.url));
+  await background.evaluate();
   return {
     model: model.namespace, workflow: workflow.namespace, api: api.namespace,
-    handoff: handoff.namespace, calls,
+    handoff: handoff.namespace, background: background.namespace, calls,
   };
 }
 
