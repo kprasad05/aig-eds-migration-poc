@@ -612,7 +612,7 @@ class RequestPublishBulkApp extends LitElement {
   }
 
   get _inboxUrl() {
-    return `https://da.live/app/adobe-rnd/aem-apps/tools/apps/publish-requests-inbox/publish-requests-inbox?org=${encodeURIComponent(this._org)}&site=${encodeURIComponent(this._site)}&requester=true`;
+    return `https://da.live/app/kprasad05/aig-eds-migration-poc/tools/apps/publish-requests-inbox/publish-requests-inbox?org=${encodeURIComponent(this._org)}&site=${encodeURIComponent(this._site)}`;
   }
 
   renderItems() {

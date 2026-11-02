@@ -92,6 +92,24 @@ async function createApp(overrides = {}, search = '') {
   return { app, requests, previews, toasts, logs };
 }
 
+test('View my requests links to this repository inbox with only the selected organization and site', async () => {
+  const { app } = await createApp();
+  app._org = 'kprasad05';
+  app._site = 'aig-eds-migration-poc';
+  app._items = [{ path: '/no/no/fragments/announcement', status: 'submitted' }];
+  const expected = 'https://da.live/app/kprasad05/aig-eds-migration-poc/tools/apps/publish-requests-inbox/publish-requests-inbox?org=kprasad05&site=aig-eds-migration-poc';
+  assert.equal(app._inboxUrl, expected);
+  assert.ok(app.render().includes(`href=${expected} target="_blank" rel="noopener">View my requests</a>`));
+
+  app._org = 'another org';
+  app._site = 'another&site';
+  const url = new URL(app._inboxUrl);
+  assert.equal(url.pathname, '/app/kprasad05/aig-eds-migration-poc/tools/apps/publish-requests-inbox/publish-requests-inbox');
+  assert.equal(url.searchParams.get('org'), 'another org');
+  assert.equal(url.searchParams.get('site'), 'another&site');
+  assert.deepEqual([...url.searchParams.keys()], ['org', 'site']);
+});
+
 const workflowHandoff = {
   version: 1, org: 'org', site: 'site',
   workflowId: 'workflow-00000000-0000-4000-8000-000000000000',
