@@ -31,6 +31,7 @@ import {
 import {
   normalizePath, isValidPath, validateSite, getTranslationDestinations,
 } from './paths.js';
+import { readWorkflowHandoff } from './handoff.js';
 
 const NX = 'https://da.live/nx2';
 const CONCURRENCY = 3;
@@ -143,7 +144,21 @@ class RequestPublishBulkApp extends LitElement {
     const params = new URLSearchParams(window.location.search);
     this._org = params.get('org') || this.context?.org || '';
     this._site = params.get('site') || this.context?.repo || '';
+    this.loadWorkflowHandoff();
     getUserEmail(this.token).then((email) => { this._userEmail = email; });
+  }
+
+  loadWorkflowHandoff() {
+    try {
+      const handoff = readWorkflowHandoff(window.location.search, this._org, this._site);
+      if (!handoff) return;
+      this._flow = 'paths';
+      this._pathsText = handoff.paths.join('\n');
+      this._notify('info', `Imported ${handoff.paths.length} destination path(s) from ${handoff.workflowId}. Review the paths, validate, explicitly preview where needed, then Request Publish. No requests have been submitted.`);
+    } catch (error) {
+      this._pathsText = '';
+      this._notify('error', error.message);
+    }
   }
 
   get _validated() {
