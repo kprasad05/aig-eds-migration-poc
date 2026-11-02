@@ -142,6 +142,10 @@ Submission rechecks pending requests and source/preview freshness before
 creating each request. A later source edit can still occur after this check;
 requests are path-based rather than pinned to a source revision.
 
+After submission, **View my requests** opens this repository's Publish Requests
+Inbox at `https://da.live/app/kprasad05/aig-eds-migration-poc/tools/apps/publish-requests-inbox/publish-requests-inbox`,
+passing the selected organization and site with `requester=true`.
+
 ## Errors and retries
 
 Errors are shown inline and through DA's shared toast component:

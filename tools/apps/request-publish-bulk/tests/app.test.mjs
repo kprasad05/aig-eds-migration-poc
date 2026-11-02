@@ -88,6 +88,24 @@ async function createApp(overrides = {}) {
   return { app, requests, previews, toasts, logs };
 }
 
+test('View my requests links to this repository inbox with the selected site and requester filter', async () => {
+  const { app } = await createApp();
+  app._org = 'kprasad05';
+  app._site = 'aig-eds-migration-poc';
+  app._items = [{ path: '/no/no/fragments/announcement', status: 'submitted' }];
+  const expected = 'https://da.live/app/kprasad05/aig-eds-migration-poc/tools/apps/publish-requests-inbox/publish-requests-inbox?org=kprasad05&site=aig-eds-migration-poc&requester=true';
+  assert.equal(app._inboxUrl, expected);
+  assert.ok(app.render().includes(`href=${expected} target="_blank" rel="noopener">View my requests</a>`));
+
+  app._org = 'another org';
+  app._site = 'another&site';
+  const url = new URL(app._inboxUrl);
+  assert.equal(url.pathname, '/app/kprasad05/aig-eds-migration-poc/tools/apps/publish-requests-inbox/publish-requests-inbox');
+  assert.equal(url.searchParams.get('org'), 'another org');
+  assert.equal(url.searchParams.get('site'), 'another&site');
+  assert.equal(url.searchParams.get('requester'), 'true');
+});
+
 test('paste flow deduplicates paths and blocks missing, stale, and invalid pages', async () => {
   const { app, requests, previews, toasts } = await createApp({
     validateContent: async (_org, _site, path) => ({
