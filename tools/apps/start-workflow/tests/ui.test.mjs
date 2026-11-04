@@ -9,7 +9,7 @@ const root = new URL('../../../../', import.meta.url);
 const appUrl = 'https://workflow.test/tools/apps/start-workflow/start-workflow.html?org=org&site=site&ref=local';
 
 async function browserFixture(t, {
-  failGerman = false, translationConfig = regionalSheets(),
+  failGerman = false, translationConfig = regionalSheets(), liveRegionalDiff = false,
 } = {}) {
   const browser = await chromium.launch({ headless: true });
   t.after(() => browser.close());
@@ -24,6 +24,7 @@ async function browserFixture(t, {
   const calls = {
     translations: 0, destinations: 0, approval: 0, errors: [], stages: [],
     backgroundSubmissions: 0, backgroundReads: 0, backgroundRecoveries: 0,
+    regionalDiffImports: 0,
   };
   page.on('pageerror', (error) => calls.errors.push(error.message));
   context.on('page', (next) => next.on('pageerror', (error) => calls.errors.push(error.message)));
@@ -74,12 +75,21 @@ async function browserFixture(t, {
       if (url.pathname.endsWith('/dnt/dnt.js')) {
         return await respond('export const addDnt = async (html) => html; export const removeDnt = async ({html}) => html;', 200, 'application/javascript');
       }
-      if (url.pathname.endsWith('/regional-diff/regional-diff.js')) {
+      if (url.href === 'https://da.live/nx/blocks/loc/regional-diff/regional-diff.js') {
+        return await respond('', 404, 'application/javascript');
+      }
+      if (url.href === 'https://da.live/nx/public/loc/regional-diff.js') {
+        calls.regionalDiffImports += 1;
+        if (state.regionalDiffUnavailable) return await respond('', 404, 'application/javascript');
+        if (liveRegionalDiff) return await route.continue();
         return await respond(`export const removeLocTags = (document) => {
-          document.querySelectorAll('da-loc-deleted, [loc-temp-dom]').forEach((el) => el.remove());
-          document.querySelectorAll('[loc-added]').forEach((el) => el.removeAttribute('loc-added'));
+          document.querySelectorAll('da-diff-deleted, da-loc-deleted, [loc-temp-dom]').forEach((el) => el.remove());
+          document.querySelectorAll('da-loc-added').forEach((el) => el.replaceWith(...el.childNodes));
+          document.querySelectorAll('[da-diff-added]').forEach((el) => el.removeAttribute('da-diff-added'));
         };`, 200, 'application/javascript');
       }
+      if (liveRegionalDiff && request.method() === 'GET'
+        && url.href.startsWith('https://da.live/nx/public/loc/')) return await route.continue();
       if (request.method() === 'OPTIONS') return await respond('', 204);
       assert.equal(request.headers().authorization, 'Bearer session');
       if (url.hostname.endsWith('.adobeioruntime.net')) {
@@ -140,7 +150,7 @@ async function browserFixture(t, {
         }
         return await respond(JSON.stringify({
           translated: form.get('data').replace('Hello', {
-            fr: 'Bonjour', de: 'Hallo', es: 'Hola',
+            fr: 'Bonjour', de: 'Hallo', es: 'Hola', no: 'Hei',
           }[form.get('tolang')] || 'Translated'),
         }));
       }
@@ -165,7 +175,7 @@ async function browserFixture(t, {
         const body = await form.get('data').text();
         if (path.startsWith('/.da/translation/active/')) projects.set(path, body);
         else {
-          assert.match(path, /^\/(?:fr|de|en|es|zh)\/[a-z]+\/fragments\/[ab]\.html$/);
+          assert.match(path, /^\/(?:fr|de|en|es|zh|no)\/[a-z]+\/fragments\/[ab]\.html$/);
           calls.destinations += 1;
           calls.stages.push(['save', path, body]);
           content.set(path, body);
@@ -191,6 +201,107 @@ async function addTarget(dialog, location, locale) {
   await dialog.getByRole('checkbox', { name: new RegExp(`\\(${locale}\\)$`) }).check();
   await summary.click();
 }
+
+test('browser: live DA regional-diff import and cleanup contract', {
+  skip: process.env.DA_NATIVE_HELPERS_LIVE !== '1',
+}, async (t) => {
+  const source = await readFile(new URL('../api.js', import.meta.url), 'utf8');
+  const moduleUrl = source.match(/import\('([^']+regional-diff[^']*)'\)/)?.[1];
+  assert.ok(moduleUrl, 'The rollout adapter must import its regional-diff helper.');
+  const browser = await chromium.launch({ headless: true });
+  t.after(() => browser.close());
+  const page = await browser.newPage();
+  await page.route('**/*', async (route) => {
+    const request = route.request();
+    if (request.method() === 'GET' && request.url().startsWith('https://da.live/nx/')) {
+      await route.continue();
+    } else {
+      await route.abort();
+    }
+  });
+  const output = await page.evaluate(async (url) => {
+    const { removeLocTags } = await import(url);
+    const document = new DOMParser().parseFromString(`<body><main>
+      <p da-diff-added>Hello Norway</p><da-diff-deleted>deleted upstream</da-diff-deleted>
+      <da-loc-deleted>legacy deleted</da-loc-deleted><p loc-temp-dom>temporary content</p>
+      <da-loc-added><p>Local addition</p></da-loc-added>
+      <div class="hero-banner"><p>Block content</p></div><p>:check:</p>
+      </main></body>`, 'text/html');
+    removeLocTags(document);
+    return document.querySelector('main').innerHTML;
+  }, moduleUrl);
+  assert.match(output, /Hello Norway/);
+  assert.match(output, /Local addition/);
+  assert.match(output, /hero-banner/);
+  assert.match(output, /:check:/);
+  assert.doesNotMatch(output, /da-diff|da-loc|loc-temp-dom|deleted upstream|legacy deleted|temporary content/);
+});
+
+test('browser: Norway-only retries a saved missing-helper failure, preserves content and metadata, and never calls App Builder', async (t) => {
+  const translationConfig = regionalSheets();
+  translationConfig.languages.data.push({
+    name: 'Norwegian - Norway', code: 'no', location: '/no', locales: '/no/no', actions: 'Skip, Translate',
+  });
+  const f = await browserFixture(t, {
+    translationConfig, liveRegionalDiff: process.env.DA_NATIVE_HELPERS_LIVE === '1',
+  });
+  f.state.regionalDiffUnavailable = true;
+  f.content.set('/en/fragments/a.html', `<body><header>source navigation</header><main>
+    <div><p da-diff-added>Hello Norway</p><da-diff-deleted>removed upstream</da-diff-deleted>
+    <da-loc-deleted>legacy removed</da-loc-deleted><p loc-temp-dom>temporary content</p>
+    <da-loc-added><p>Local addition</p></da-loc-added>
+    <div class="hero-banner"><div><div><p>Block content</p></div></div></div><p>:check:</p></div>
+    </main><div class="da-metadata">
+    <div><div>acceptedHashes</div><div>accepted</div></div>
+    <div><div>rejectedHashes</div><div>rejected</div></div>
+    <div><div>title</div><div>Norway title</div></div>
+    </div><footer>source footer</footer></body>`);
+  await f.page.goto(appUrl);
+  await f.page.getByLabel('/en/fragments/a.html', { exact: true }).check();
+  await f.page.getByRole('button', { name: 'Start Workflow (1)', exact: true }).click();
+  const dialog = f.page.getByRole('dialog');
+  await addTarget(dialog, '/no', '/no/no');
+  await expect(dialog.getByRole('checkbox', { name: /^All Countries/ })).not.toBeChecked();
+  await dialog.getByLabel('Project title').fill('Norway regression');
+  await dialog.getByLabel('I understand that existing destination content will be overwritten.').check();
+  await dialog.getByRole('button', { name: 'Create project and run' }).click();
+  await expect(f.page.getByRole('alert').filter({ hasText: 'Execution stopped. Progress is saved in DA.' })).toBeVisible();
+  await expect(f.page.getByRole('cell').filter({ hasText: 'Failed to fetch dynamically imported module' })).toBeVisible();
+  assert.equal(f.calls.translations, 0);
+  assert.equal(f.calls.destinations, 0);
+  assert.equal(f.calls.approval, 0);
+  const failed = JSON.parse([...f.projects.values()].at(-1));
+  assert.equal(failed.workflow.items[0].status, 'failed');
+  assert.equal(failed.workflow.items[0].rolloutStatus, 'queued');
+  f.state.regionalDiffUnavailable = false;
+  await f.page.reload();
+  await f.page.getByRole('button', { name: failed.id, exact: true }).click();
+  await f.page.getByRole('button', { name: 'Resume / retry unfinished tasks', exact: true }).click();
+  await expect(f.page.getByRole('status').filter({ hasText: '1/1 destinations saved' })).toBeVisible();
+  assert.equal(f.calls.regionalDiffImports, 2);
+  assert.equal(f.calls.backgroundSubmissions, 0);
+  assert.equal(f.calls.translations, 1);
+  assert.equal(f.calls.destinations, 2);
+  assert.equal(f.calls.approval, 0);
+  const output = f.content.get('/no/no/fragments/a.html');
+  assert.match(output, /Hei Norway/);
+  assert.match(output, /Local addition/);
+  assert.match(output, /class="hero-banner"/);
+  assert.match(output, /:check:/);
+  assert.match(output, /class="da-metadata"/);
+  assert.match(output, /Norway title/);
+  assert.doesNotMatch(output, /da-diff|da-loc|loc-temp-dom|acceptedHashes|rejectedHashes|source navigation|source footer/);
+  const persisted = JSON.parse([...f.projects.values()].at(-1));
+  assert.equal(persisted.id, failed.id);
+  assert.equal(persisted.workflow.items[0].status, 'complete');
+  await f.page.reload();
+  await f.page.getByRole('button', { name: persisted.id, exact: true }).click();
+  await expect(f.page.getByRole('button', { name: 'Resume / retry unfinished tasks', exact: true })).toBeDisabled();
+  await expect(f.page.getByRole('status').filter({ hasText: '1/1 destinations saved' })).toBeVisible();
+  assert.equal(f.calls.translations, 1);
+  assert.equal(f.calls.destinations, 2);
+  assert.deepEqual(f.calls.errors, []);
+});
 
 test('browser: All Countries submits to App Builder and progress survives closing the original tab', async (t) => {
   const f = await browserFixture(t);

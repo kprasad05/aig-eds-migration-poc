@@ -107,7 +107,7 @@ export default function createClient(org, site, token) {
       const document = new DOMParser().parseFromString(content, 'text/html');
       const main = document.querySelector('main');
       if (!main) throw new Error('Rollout source HTML is missing its main content.');
-      const { removeLocTags } = await import('https://da.live/nx/blocks/loc/regional-diff/regional-diff.js');
+      const { removeLocTags } = await import('https://da.live/nx/public/loc/regional-diff.js');
       removeLocTags(document);
       const metadata = document.querySelector('body > .da-metadata');
       metadata?.querySelectorAll(':scope > div').forEach((row) => {
