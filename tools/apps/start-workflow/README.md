@@ -349,6 +349,13 @@ confirms each write itself rather than using native frontend/global project
 state. It does not merge regional changes, generate regional diffs, or create
 native named rollout versions.
 
+`removeLocTags` is loaded from `https://da.live/nx/public/loc/regional-diff.js`,
+the same module used by DA's current native copy helper. The former
+`nx/blocks/loc/regional-diff/regional-diff.js` path returns 404. A project that
+failed loading that module can be retrieved and retried after loading the
+updated app; no new project is required if its source and configuration are
+unchanged.
+
 ### Task states and retries
 
 | State | Meaning |
@@ -410,6 +417,18 @@ pattern. Tests use installed Playwright for real Chromium UI checks with mocked
 DA/Google responses. They never contact the real provider or write tenant content.
 Repository-wide JS lint normally ignores `tools/`, so the focused command uses
 `--no-ignore`; repository-wide CSS lint does not cover app styles.
+
+To check the adapter's actual deployed regional-diff import and cleanup contract,
+run the opt-in browser smoke test:
+
+```sh
+DA_NATIVE_HELPERS_LIVE=1 node --test --test-name-pattern='live DA regional-diff|Norway-only' tools/apps/start-workflow/tests/ui.test.mjs
+```
+
+Live traffic is limited to read-only GETs to DA's helper modules. The Norway-only
+test also exercises the local adapter with the real helper; translation and
+source/project saves remain mocked. These checks need no DA login and do not
+translate, save tenant content, or submit publish requests.
 
 Coverage includes multi-selection, target wizard/cancel, native-shaped project
 creation, partial provider failure, reload/status retrieval, actual save
