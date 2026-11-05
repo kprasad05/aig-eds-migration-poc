@@ -92,12 +92,12 @@ async function createApp(overrides = {}, search = '') {
   return { app, requests, previews, toasts, logs };
 }
 
-test('View my requests links to this repository inbox with only the selected organization and site', async () => {
+test('View my requests links to this repository inbox in requester mode with the selected organization and site', async () => {
   const { app } = await createApp();
   app._org = 'kprasad05';
   app._site = 'aig-eds-migration-poc';
   app._items = [{ path: '/no/no/fragments/announcement', status: 'submitted' }];
-  const expected = 'https://da.live/app/kprasad05/aig-eds-migration-poc/tools/apps/publish-requests-inbox/publish-requests-inbox?org=kprasad05&site=aig-eds-migration-poc';
+  const expected = 'https://da.live/app/kprasad05/aig-eds-migration-poc/tools/apps/publish-requests-inbox/publish-requests-inbox?org=kprasad05&site=aig-eds-migration-poc&requester=true';
   assert.equal(app._inboxUrl, expected);
   assert.ok(app.render().includes(`href=${expected} target="_blank" rel="noopener">View my requests</a>`));
 
@@ -107,7 +107,8 @@ test('View my requests links to this repository inbox with only the selected org
   assert.equal(url.pathname, '/app/kprasad05/aig-eds-migration-poc/tools/apps/publish-requests-inbox/publish-requests-inbox');
   assert.equal(url.searchParams.get('org'), 'another org');
   assert.equal(url.searchParams.get('site'), 'another&site');
-  assert.deepEqual([...url.searchParams.keys()], ['org', 'site']);
+  assert.equal(url.searchParams.get('requester'), 'true');
+  assert.deepEqual([...url.searchParams.keys()], ['org', 'site', 'requester']);
 });
 
 const workflowHandoff = {
