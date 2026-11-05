@@ -170,7 +170,9 @@ requests are path-based rather than pinned to a source revision.
 
 After submission, **View my requests** opens this repository's Publish Requests
 Inbox at `https://da.live/app/kprasad05/aig-eds-migration-poc/tools/apps/publish-requests-inbox/publish-requests-inbox`,
-passing only the selected organization and site, without a requester filter.
+passing the selected organization and site with `requester=true`. This opens
+**My Publish Requests**, showing the signed-in user's submitted pending requests
+with Resend and Withdraw actions, rather than requests they are allowed to approve.
 
 ## Errors and retries
 
