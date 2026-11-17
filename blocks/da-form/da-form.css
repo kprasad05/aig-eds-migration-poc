@@ -1,0 +1,563 @@
+/*
+ * Adapted from aemsites/da-block-collection, blocks/form/form.css (Apache-2.0).
+ * Modified: demo layout and explicit error styles; renamed to da-form.
+ */
+.da-form {
+  max-width: 620px;
+  padding: 28px;
+  border: 1px solid #dbe4e8;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.da-form .field-wrapper {
+  display: grid;
+  grid-auto-flow: row;
+  align-items: center;
+}
+
+.da-form fieldset {
+  display: grid;
+  grid-auto-flow: row;
+  margin: 0;
+  border: none;
+  padding: 0;
+}
+
+.da-form :where(form > .field-wrapper + .field-wrapper),
+.da-form :where(form fieldset .field-wrapper + .field-wrapper) {
+  margin-top: 24px;
+}
+
+.da-form label,
+.da-form fieldset > legend {
+  margin-bottom: 0.25em;
+  font-size: var(--body-font-size-s);
+  font-weight: 700;
+}
+
+.da-form .selection-wrapper label {
+  margin: 0;
+  font-weight: normal;
+}
+
+.da-form input,
+.da-form select,
+.da-form textarea {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.5em;
+  border-radius: 4px;
+  border: 1px solid var(--dark-color);
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font: inherit;
+}
+
+.da-form textarea {
+  resize: vertical;
+}
+
+.da-form input:focus,
+.da-form select:focus,
+.da-form textarea:focus {
+  outline: 2px solid var(--link-color);
+  outline-offset: 2px;
+}
+
+.da-form .selection-wrapper {
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: 1ch;
+}
+
+.da-form .selection-wrapper input {
+  width: max-content;
+}
+
+.da-form label[data-required]::after {
+  content: '*';
+  color: firebrick;
+  margin-inline-start: 1ch;
+}
+
+.da-form .toggle-wrapper .switch {
+  position: relative;
+  display: inline-block;
+  width: 52px;
+  height: 28px;
+}
+
+.da-form .toggle-wrapper input {
+  opacity: 0;
+  width: 52px;
+  height: 28px;
+}
+
+.da-form .toggle-wrapper .slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  border-radius: 28px;
+  background-color: var(--dark-color);
+}
+
+.da-form .toggle-wrapper .slider::before {
+  content: '';
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  top: 2px;
+  left: 2px;
+  border-radius: 50%;
+  background-color: var(--background-color);
+}
+
+.da-form .toggle-wrapper input:checked + .slider {
+  background-color: var(--link-color);
+}
+
+.da-form .toggle-wrapper input:focus + .slider {
+  outline: 2px solid var(--link-color);
+  outline-offset: 2px;
+}
+
+.da-form .toggle-wrapper input:checked + .slider::before {
+  transform: translateX(24px);
+}
+
+.da-form .journey-error {
+  padding: 16px;
+  background: #fff1f1;
+  color: #8a2020;
+  border: 1px solid #db9c9c;
+}
+
+@media (width >= 600px) {
+  .da-form fieldset {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+  }
+
+  .da-form :where(form fieldset .field-wrapper + .field-wrapper) {
+    margin-top: 0;
+  }
+}
+
+  .da-form.car {
+    max-width: 1120px;
+    padding: 64px 0 40px;
+    border: 0;
+    border-radius: 0;
+    margin: auto;
+    color: #333;
+    font-family: var(--heading-font-family);
+  }
+
+  .da-form.car .quote-sr-only,
+  .da-form.car label,
+  .da-form.car legend {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .da-form.car :where(form > .field-wrapper) {
+    margin: 0;
+  }
+
+  .da-form.car .quote-line {
+    margin: 0;
+  }
+
+  .da-form.car fieldset {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0 6px;
+    min-width: 0;
+    margin-bottom: 0;
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 50px;
+  }
+
+  .da-form.car fieldset .field-wrapper {
+    display: contents;
+  }
+
+  .da-form.car .field-wrapper[hidden],
+  .da-form.car .quote-tooltip[hidden],
+  .da-form.car .quote-options[hidden] {
+    display: none;
+  }
+
+  .da-form.car .quote-control {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+  }
+
+  .da-form.car input,
+  .da-form.car select {
+    width: 110px;
+    max-width: 100%;
+    height: 50px;
+    padding: 0 22px 0 8px;
+    margin: 0 0 15px;
+    border: 0;
+    border-bottom: 1px solid #002453;
+    border-radius: 0;
+    background: transparent;
+    color: #5b5c60;
+    font-family: var(--heading-font-family);
+    font-size: 20px;
+    font-weight: 400;
+    line-height: normal;
+  }
+
+  .da-form.car .search-control input {
+    padding-right: 24px;
+  }
+
+  .da-form.car input[type="number"] {
+    padding-right: 4px;
+  }
+
+  .da-form.car input::placeholder {
+    color: #7c7c7c;
+    font-weight: 500;
+    opacity: 1;
+  }
+
+  .da-form.car [aria-invalid="true"] {
+    border-color: #c62828;
+    color: #c62828;
+  }
+
+  .da-form.car input[aria-invalid="true"]::placeholder {
+    color: #c62828;
+  }
+
+  .da-form.car input[type="number"]::-webkit-inner-spin-button,
+  .da-form.car input[type="number"]::-webkit-outer-spin-button {
+    appearance: none;
+    display: none;
+    margin: 0;
+  }
+
+  .da-form.car input:disabled {
+    opacity: 1;
+  }
+
+  .da-form.car select {
+    appearance: none;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='10' viewBox='0 0 16 10'%3E%3Cpath d='m1 1 7 7 7-7' fill='none' stroke='%23333' stroke-width='1.3'/%3E%3C/svg%3E") no-repeat right 6px center;
+  }
+
+  .da-form.car .quote-dropdown {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 26px;
+    height: 50px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .da-form.car .quote-dropdown::after {
+    display: block;
+    width: 9px;
+    height: 9px;
+    margin: 0 auto 5px;
+    border-right: 1px solid #333;
+    border-bottom: 1px solid #333;
+    content: '';
+    transform: rotate(45deg);
+  }
+
+  .da-form.car .search-control:has(.quote-help) .quote-dropdown {
+    right: 41px;
+  }
+
+  .da-form.car .quote-options {
+    position: absolute;
+    z-index: 3;
+    top: 50px;
+    left: 0;
+    width: 100%;
+    max-height: 240px;
+    overflow-y: auto;
+    border: 1px solid #002453;
+    background: #fff;
+    box-shadow: 0 4px 15px #0002;
+    font: 18px/1.4 var(--heading-font-family);
+  }
+
+  .da-form.car .search-control:has(.quote-help) .quote-options {
+    width: calc(100% - 41px);
+  }
+
+  .da-form.car .quote-option {
+    display: block;
+    width: 100%;
+    padding: 8px;
+    border: 0;
+    border-radius: 0;
+    margin: 0;
+    background: #fff;
+    color: #333;
+    font: inherit;
+    text-align: left;
+    white-space: normal;
+    cursor: pointer;
+  }
+
+  .da-form.car .quote-option:hover,
+  .da-form.car .quote-option[aria-selected="true"] {
+    background: #edf2fa;
+  }
+
+  .da-form.car .quote-no-options {
+    display: block;
+    padding: 8px;
+  }
+
+  .da-form.car .quote-validation {
+    box-sizing: border-box;
+    position: fixed;
+    top: 100px;
+    width: min(830px, calc(100vw - 32px));
+    max-height: calc(100vh - 132px);
+    padding: 48px 32px 32px;
+    border: 1px solid #ddd;
+    border-radius: 0;
+    margin: 0 auto;
+    background: #fff;
+    color: #333;
+    box-shadow: 0 5px 20px #0003;
+    font: 20px/1.5 var(--body-font-family);
+    text-align: center;
+  }
+
+  .da-form.car .quote-validation::backdrop {
+    background: #0006;
+  }
+
+  .da-form.car .quote-validation-close {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    padding: 4px 8px;
+    border: 0;
+    margin: 0;
+    background: transparent;
+    color: #333;
+    font: 28px/1 var(--body-font-family);
+    cursor: pointer;
+  }
+
+  .da-form.car .vehicle-make input {
+    width: 160px;
+  }
+
+  .da-form.car .vehicle-model input {
+    width: 240px;
+  }
+
+  .da-form.car .occupation input {
+    width: 260px;
+  }
+
+  .da-form.car .registration-year select,
+  .da-form.car .dob-day select,
+  .da-form.car .dob-year input,
+  .da-form.car .driving-years input {
+    width: 80px;
+  }
+
+  .da-form.car .dob-month select,
+  .da-form.car .ncd select {
+    width: 96px;
+  }
+
+  .da-form.car .effective-date input {
+    width: 192px;
+    padding-right: 4px;
+    color: transparent;
+  }
+
+  .da-form.car .claim-count select {
+    width: 131px;
+  }
+
+  .da-form.car .date-display {
+    position: absolute;
+    top: 0;
+    left: 8px;
+    color: #5b5c60;
+    font-size: 20px;
+    font-weight: 400;
+    line-height: 50px;
+    pointer-events: none;
+  }
+
+  .da-form.car .quote-control:has([aria-invalid="true"]) .date-display {
+    color: #c62828;
+  }
+
+  .da-form.car .claim-amount input {
+    width: 160px;
+  }
+
+  .da-form.car .marital-status select {
+    width: 152px;
+  }
+
+  .da-form.car .driver-gender select {
+    width: 112px;
+  }
+
+  .da-form.car .vehicle-registration input {
+    width: 144px;
+    text-transform: uppercase;
+  }
+
+  .da-form.car .driver-age-condition select {
+    width: 212px;
+  }
+
+  .da-form.car .annual-mileage select {
+    width: 266px;
+  }
+
+  .da-form.car .off-peak-car select {
+    width: 192px;
+  }
+
+  .da-form.car .quote-help {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 27px;
+    height: 27px;
+    padding: 0;
+    margin: 0 4px 15px 10px;
+    border: 2px solid #001871;
+    border-radius: 50%;
+    background: #fff;
+    color: #333;
+    font: 500 22px/1 var(--heading-font-family);
+    cursor: pointer;
+  }
+
+  .da-form.car .quote-tooltip {
+    position: absolute;
+    z-index: 2;
+    top: 44px;
+    right: 0;
+    width: min(260px, 70vw);
+    padding: 12px;
+    border: 1px solid #001871;
+    background: #fff;
+    color: #343741;
+    box-shadow: 0 4px 15px #0002;
+    font: 15px/1.4 var(--body-font-family);
+  }
+
+  .da-form.car .promo-code {
+    display: flex;
+    justify-content: center;
+    margin-top: 65px;
+  }
+
+  .da-form.car .promo-code input {
+    width: 190px;
+    height: 56px;
+    padding: 0 18px;
+    border: 1px solid #b1b1b1;
+    font: 16px var(--body-font-family);
+  }
+
+  .da-form.car .submit-quote {
+    display: flex;
+    justify-content: center;
+    margin-top: 36px;
+  }
+
+  .da-form.car .submit-quote button {
+    width: auto;
+    min-width: 163px;
+    min-height: 57px;
+    padding: 12px 22px;
+    border: 0;
+    border-radius: 0;
+    margin: 0;
+    background: #ff8200;
+    color: #001871;
+    font: 400 20px var(--body-font-family);
+  }
+
+  .da-form.car .submit-quote button:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+
+  .da-form.car .quote-demo-note {
+    margin-top: 24px;
+    text-align: center;
+    font: 13px var(--body-font-family);
+  }
+
+  .da-form.car .sample-quote {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #001871;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .da-form.car input[type="hidden"] {
+    display: none;
+  }
+
+  @media (width >= 600px) {
+    .da-form.car {
+      padding-top: 80px;
+    }
+
+    .da-form.car fieldset {
+      gap: 0 8px;
+      font-size: 24px;
+    }
+
+    .da-form.car .vehicle-model input {
+      width: 288px;
+    }
+
+    .da-form.car .occupation input {
+      width: 320px;
+    }
+
+    .da-form.car .promo-code {
+      margin-top: 85px;
+    }
+
+    .da-form.car .submit-quote {
+      margin-top: 50px;
+    }
+  }
